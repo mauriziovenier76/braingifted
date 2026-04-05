@@ -14,7 +14,7 @@ export default function Home() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://api.fontshare.com/v2/css?f[]=clash-display@600,700&f[]=satoshi@300,400,500&display=swap');
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -27,8 +27,8 @@ export default function Home() {
           --border: #222222;
           --text: #f0f0f0;
           --muted: #666666;
-          --font-display: 'Syne', sans-serif;
-          --font-body: 'DM Sans', sans-serif;
+          --font-display: 'Clash Display', sans-serif;
+          --font-body: 'Satoshi', sans-serif;
         }
 
         html { scroll-behavior: smooth; }
@@ -475,7 +475,7 @@ export default function Home() {
           <span className="badge-dot"></span>
           Powered by AI · Studia 3x più veloce
         </div>
-        <h1>Studia <em>meno</em>,<br />impara di più.</h1>
+        <h1>Studia <em>meglio</em>,<br />impara di più.</h1>
         <p>Carica i tuoi appunti, PDF o presentazioni. BrainGifted li trasforma in riassunti, flashcard e quiz in secondi.</p>
         <div className="hero-cta">
           <button className="btn-primary">Inizia gratis →</button>
