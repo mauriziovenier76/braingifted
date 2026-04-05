@@ -1,0 +1,20 @@
+domanin: braingifted.com
+Registrato tramite https://dash.cloudflare.com
+usando l'email maurizio.venier@outlook.com
+con la solita password
+
+GITHUB
+fatto con maurizio.venier@outlook.it
+la password è la solita ma ripetuta 2 volte
+username mauriziovenier76
+
+SUPABASE
+accesso tramite account Github
+Organization: braingifted
+Project name braingifted
+Password: fQ7ySfU3S0waDZi
+
+VERCEL
+Personal Project (free)
+Name: Maurizio Venier
+Autenticato con GITHUB
