@@ -23,37 +23,38 @@ export default function Dashboard() {
   }, []);
 
   const handleFile = async (file) => {
-    if (!file || file.type !== "application/pdf") {
-      setError("Per ora accettiamo solo file PDF.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setError("Il file è troppo grande. Massimo 10MB.");
-      return;
-    }
+  if (!file || file.type !== "application/pdf") {
+    setError("Per ora accettiamo solo file PDF.");
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    setError("Il file è troppo grande. Massimo 10MB.");
+    return;
+  }
 
-    setUploading(true);
-    setError("");
-    setResult(null);
+  setUploading(true);
+  setError("");
+  setResult(null);
 
-    try {
-  const formData = new FormData();
-  formData.append("file", file);
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
 
-  const response = await fetch("/api/summarize", {
-    method: "POST",
-    body: formData,
-  });
+    const response = await fetch("/api/summarize", {
+      method: "POST",
+      body: formData,
+    });
 
-  if (!response.ok) throw new Error("Errore nella generazione del riassunto.");
-  const data = await response.json();
-  setResult({ fileName: file.name, summary: data.summary });
+    if (!response.ok) throw new Error("Errore nella generazione del riassunto.");
+    const data = await response.json();
+    setResult({ fileName: file.name, summary: data.summary });
 
-} catch (err) {
-  setError(err.message || "Qualcosa è andato storto.");
-} finally {
-  setUploading(false);
-}
+  } catch (err) {
+    setError(err.message || "Qualcosa è andato storto.");
+  } finally {
+    setUploading(false);
+  }
+};
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
