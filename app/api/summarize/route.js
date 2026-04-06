@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { extractText } from "unpdf";
 
 export const runtime = "nodejs";
 
@@ -12,13 +13,11 @@ export async function POST(request) {
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const buffer = new Uint8Array(arrayBuffer);
+    const { text } = await extractText(buffer, { mergePages: true });
+    const trimmedText = text?.slice(0, 8000) || "";
 
-    const pdfParse = (await import("pdf-parse")).default;
-    const pdfData = await pdfParse(buffer);
-    const text = pdfData.text?.slice(0, 8000) || "";
-
-    if (!text || text.trim().length < 50) {
+    if (!trimmedText || trimmedText.trim().length < 50) {
       return NextResponse.json({ error: "Impossibile estrarre testo dal PDF" }, { status: 400 });
     }
 
@@ -44,7 +43,7 @@ export async function POST(request) {
 scrivi un riassunto dettagliato ma conciso
 
 Testo:
-${text}`,
+${trimmedText}`,
           },
         ],
       }),
