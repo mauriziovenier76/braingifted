@@ -37,61 +37,23 @@ export default function Dashboard() {
     setResult(null);
 
     try {
-      // 1. Carica su Supabase Storage
-      const filePath = `${user.id}/${Date.now()}_${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(filePath, file);
-      if (uploadError) throw new Error("Errore durante l'upload.");
+  const formData = new FormData();
+  formData.append("file", file);
 
-      // 2. Estrai testo dal PDF
-      const text = await extractTextFromPDF(file);
-      if (!text || text.length < 50) throw new Error("Non riesco a leggere il testo dal PDF.");
+  const response = await fetch("/api/summarize", {
+    method: "POST",
+    body: formData,
+  });
 
-      // 3. Genera riassunto con AI
-      const summary = await generateSummary(text);
-      setResult({ fileName: file.name, summary });
+  if (!response.ok) throw new Error("Errore nella generazione del riassunto.");
+  const data = await response.json();
+  setResult({ fileName: file.name, summary: data.summary });
 
-    } catch (err) {
-      setError(err.message || "Qualcosa è andato storto.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const extractTextFromPDF = async (file) => {
-  const pdfjsLib = await import("pdfjs-dist");
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let fullText = "";
-  const maxPages = Math.min(pdf.numPages, 15);
-  for (let i = 1; i <= maxPages; i++) {
-    try {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = content.items
-        .filter(item => item && typeof item.str === "string")
-        .map(item => item.str)
-        .join(" ");
-      fullText += pageText + "\n";
-    } catch (e) {
-      console.warn(`Pagina ${i} saltata:`, e);
-    }
-  }
-  return fullText;
-};
-
-  const generateSummary = async (text) => {
-    const response = await fetch("/api/summarize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text.slice(0, 8000) }),
-    });
-    if (!response.ok) throw new Error("Errore nella generazione del riassunto.");
-    const data = await response.json();
-    return data.summary;
-  };
+} catch (err) {
+  setError(err.message || "Qualcosa è andato storto.");
+} finally {
+  setUploading(false);
+}
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

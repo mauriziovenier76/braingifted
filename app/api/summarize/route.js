@@ -1,7 +1,22 @@
 import { NextResponse } from "next/server";
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
 
 export async function POST(request) {
-  const { text } = await request.json();
+  const formData = await request.formData();
+  const file = formData.get("file");
+
+  if (!file) {
+    return NextResponse.json({ error: "Nessun file ricevuto" }, { status: 400 });
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  const pdfData = await pdfParse(buffer);
+  const text = pdfData.text.slice(0, 8000);
+
+  if (!text || text.length < 50) {
+    return NextResponse.json({ error: "Impossibile estrarre testo dal PDF" }, { status: 400 });
+  }
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -16,16 +31,15 @@ export async function POST(request) {
       messages: [
         {
           role: "user",
-          content: `Sei un assistente di studio. Analizza questo testo e crea un riassunto chiaro e ben strutturato in italiano. 
-          
-Organizza il riassunto così:
+          content: `Sei un assistente di studio. Analizza questo testo e crea un riassunto chiaro in italiano.
+
 📌 PUNTI CHIAVE
 - elenca i concetti principali
 
 📝 RIASSUNTO
 scrivi un riassunto dettagliato ma conciso
 
-Testo da analizzare:
+Testo:
 ${text}`,
         },
       ],
@@ -33,7 +47,7 @@ ${text}`,
   });
 
   if (!response.ok) {
-    return NextResponse.json({ error: "Errore API" }, { status: 500 });
+    return NextResponse.json({ error: "Errore API AI" }, { status: 500 });
   }
 
   const data = await response.json();
