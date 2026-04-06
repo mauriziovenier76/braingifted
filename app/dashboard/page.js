@@ -67,9 +67,17 @@ export default function Dashboard() {
   let fullText = "";
   const maxPages = Math.min(pdf.numPages, 15);
   for (let i = 1; i <= maxPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    fullText += content.items.map(item => item.str).join(" ") + "\n";
+    try {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .filter(item => item && typeof item.str === "string")
+        .map(item => item.str)
+        .join(" ");
+      fullText += pageText + "\n";
+    } catch (e) {
+      console.warn(`Pagina ${i} saltata:`, e);
+    }
   }
   return fullText;
 };
