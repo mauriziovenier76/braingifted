@@ -8,14 +8,13 @@ export async function POST(request) {
     const formData = await request.formData();
     const file = formData.get("file");
 
-    if (!file) {
-      return NextResponse.json({ error: "Nessun file ricevuto" }, { status: 400 });
-    }
-
     const arrayBuffer = await file.arrayBuffer();
     const buffer = new Uint8Array(arrayBuffer);
     const { text } = await extractText(buffer, { mergePages: true });
     const trimmedText = text?.slice(0, 8000) || "";
+
+    console.log("Testo estratto (primi 200 char):", trimmedText.slice(0, 200));
+    console.log("Lunghezza testo:", trimmedText.length);
 
     if (!trimmedText || trimmedText.trim().length < 50) {
       return NextResponse.json({ error: "Impossibile estrarre testo dal PDF" }, { status: 400 });
@@ -46,25 +45,15 @@ ${trimmedText}`,
       }),
     });
 
-    if (!response.ok) {
-      const errData = await response.json();
-      console.error("Anthropic error:", errData);
-      return NextResponse.json({ error: "Errore API AI" }, { status: 500 });
-    }
-
     const data = await response.json();
+    console.log("Risposta Anthropic:", JSON.stringify(data).slice(0, 500));
+
     let raw = data.content[0].text.trim();
-
-    // Rimuove eventuali backtick o markdown
     raw = raw.replace(/```json/g, "").replace(/```/g, "").trim();
-
-    // Estrae solo la parte JSON
     const start = raw.indexOf("[");
     const end = raw.lastIndexOf("]");
-    if (start === -1 || end === -1) throw new Error("JSON non trovato nella risposta");
-    const jsonStr = raw.slice(start, end + 1);
-
-    const flashcards = JSON.parse(jsonStr);
+    if (start === -1 || end === -1) throw new Error("JSON non trovato: " + raw.slice(0, 200));
+    const flashcards = JSON.parse(raw.slice(start, end + 1));
     return NextResponse.json({ flashcards });
 
   } catch (err) {
