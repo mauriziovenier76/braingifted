@@ -30,11 +30,11 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 2048,
+        max_tokens: 4096,
         messages: [
           {
             role: "user",
-            content: `Sei un assistente di studio. Dal testo seguente crea 5 domande a scelta multipla in italiano.
+            content: `Sei un assistente di studio. Dal testo seguente crea 10 domande a scelta multipla in italiano.
 
 Ogni domanda deve avere 4 opzioni di risposta (a, b, c, d) e una sola risposta corretta.
 
