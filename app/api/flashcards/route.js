@@ -46,13 +46,12 @@ ${trimmedText}`,
     });
 
     const data = await response.json();
-    console.log("Risposta Anthropic:", JSON.stringify(data).slice(0, 500));
+    let raw = data.content[0].text;
 
-    let raw = data.content[0].text.trim();
-    raw = raw.replace(/```json/g, "").replace(/```/g, "").trim();
+    // Estrai direttamente tutto ciò che sta tra [ e ]
     const start = raw.indexOf("[");
     const end = raw.lastIndexOf("]");
-    if (start === -1 || end === -1) throw new Error("JSON non trovato: " + raw.slice(0, 200));
+    if (start === -1 || end === -1) throw new Error("JSON non trovato");
     const flashcards = JSON.parse(raw.slice(start, end + 1));
     return NextResponse.json({ flashcards });
 
