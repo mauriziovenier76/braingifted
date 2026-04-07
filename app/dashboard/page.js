@@ -9,6 +9,13 @@ export default function Dashboard() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const [activeTab, setActiveTab] = useState("summary");
+  const [flashcards, setFlashcards] = useState([]);
+  const [loadingFlashcards, setLoadingFlashcards] = useState(false);
+  const [currentCard, setCurrentCard] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [known, setKnown] = useState([]);
+  const fileRef = useRef(null);
   const fileInputRef = useRef();
   const supabase = createClient();
   const router = useRouter();
@@ -23,38 +30,73 @@ export default function Dashboard() {
   }, []);
 
   const handleFile = async (file) => {
-  if (!file || file.type !== "application/pdf") {
-    setError("Per ora accettiamo solo file PDF.");
-    return;
-  }
-  if (file.size > 10 * 1024 * 1024) {
-    setError("Il file è troppo grande. Massimo 10MB.");
-    return;
-  }
+    if (!file || file.type !== "application/pdf") {
+      setError("Per ora accettiamo solo file PDF.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Il file è troppo grande. Massimo 10MB.");
+      return;
+    }
+    fileRef.current = file;
+    setUploading(true);
+    setError("");
+    setResult(null);
+    setFlashcards([]);
+    setCurrentCard(0);
+    setKnown([]);
 
-  setUploading(true);
-  setError("");
-  setResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/summarize", {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) throw new Error("Errore nella generazione del riassunto.");
+      const data = await response.json();
+      setResult({ fileName: file.name, summary: data.summary });
+      setActiveTab("summary");
+    } catch (err) {
+      setError(err.message || "Qualcosa è andato storto.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
+  const handleGenerateFlashcards = async () => {
+    if (!fileRef.current) return;
+    setLoadingFlashcards(true);
+    setFlipped(false);
+    setCurrentCard(0);
+    setKnown([]);
+    try {
+      const formData = new FormData();
+      formData.append("file", fileRef.current);
+      const response = await fetch("/api/flashcards", {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) throw new Error("Errore nella generazione delle flashcard.");
+      const data = await response.json();
+      setFlashcards(data.flashcards);
+      setActiveTab("flashcards");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingFlashcards(false);
+    }
+  };
 
-    const response = await fetch("/api/summarize", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) throw new Error("Errore nella generazione del riassunto.");
-    const data = await response.json();
-    setResult({ fileName: file.name, summary: data.summary });
-
-  } catch (err) {
-    setError(err.message || "Qualcosa è andato storto.");
-  } finally {
-    setUploading(false);
-  }
-};
+  const handleKnown = (knownIt) => {
+    setKnown(prev => [...prev, { index: currentCard, known: knownIt }]);
+    setFlipped(false);
+    setTimeout(() => {
+      if (currentCard < flashcards.length - 1) {
+        setCurrentCard(prev => prev + 1);
+      }
+    }, 200);
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -62,6 +104,10 @@ export default function Dashboard() {
   };
 
   if (!user) return null;
+
+  const doneCards = known.length;
+  const knownCards = known.filter(k => k.known).length;
+  const isLastCard = currentCard === flashcards.length - 1 && known.length === flashcards.length;
 
   return (
     <>
@@ -95,95 +141,94 @@ export default function Dashboard() {
         .subtitle { color: var(--muted); margin-bottom: 40px; font-size: 0.95rem; }
         .email { color: var(--lime); }
 
-        /* UPLOAD ZONE */
+        /* UPLOAD */
         .upload-zone {
-          border: 2px dashed var(--border);
-          border-radius: 20px;
-          padding: 56px 32px;
-          text-align: center;
-          cursor: pointer;
-          transition: all 0.2s;
-          background: var(--surface);
+          border: 2px dashed var(--border); border-radius: 20px;
+          padding: 56px 32px; text-align: center; cursor: pointer;
+          transition: all 0.2s; background: var(--surface);
         }
         .upload-zone:hover, .upload-zone.drag-over {
-          border-color: var(--lime);
-          background: rgba(200,241,53,0.03);
+          border-color: var(--lime); background: rgba(200,241,53,0.03);
         }
         .upload-icon { font-size: 2.5rem; margin-bottom: 16px; }
-        .upload-title {
-          font-family: var(--font-display);
-          font-size: 1.3rem; font-weight: 700;
-          margin-bottom: 8px;
-        }
+        .upload-title { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; margin-bottom: 8px; }
         .upload-subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
         .btn-upload {
-          background: var(--lime); color: #000;
-          border: none; padding: 12px 28px;
-          border-radius: 100px;
-          font-family: var(--font-body);
-          font-size: 0.9rem; font-weight: 500;
+          background: var(--lime); color: #000; border: none;
+          padding: 12px 28px; border-radius: 100px;
+          font-family: var(--font-body); font-size: 0.9rem; font-weight: 500;
           cursor: pointer; transition: all 0.2s;
         }
-        .btn-upload:hover { opacity: 0.9; }
         .upload-note { font-size: 0.78rem; color: var(--muted); margin-top: 16px; }
 
         /* LOADING */
-        .loading {
-          background: var(--surface); border: 1px solid var(--border);
-          border-radius: 20px; padding: 48px;
-          text-align: center;
-        }
-        .spinner {
-          width: 40px; height: 40px;
-          border: 3px solid var(--border);
-          border-top-color: var(--lime);
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-          margin: 0 auto 20px;
-        }
+        .loading { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 48px; text-align: center; }
+        .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--lime); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .loading p { color: var(--muted); font-size: 0.95rem; }
 
         /* ERROR */
-        .error-box {
-          background: rgba(255,80,80,0.08);
-          border: 1px solid rgba(255,80,80,0.2);
-          border-radius: 12px; padding: 16px 20px;
-          color: #ff5050; font-size: 0.9rem;
-          margin-bottom: 24px;
-        }
+        .error-box { background: rgba(255,80,80,0.08); border: 1px solid rgba(255,80,80,0.2); border-radius: 12px; padding: 16px 20px; color: #ff5050; font-size: 0.9rem; margin-bottom: 24px; }
 
-        /* RESULT */
-        .result { margin-top: 32px; }
-        .result-header {
-          display: flex; align-items: center; justify-content: space-between;
-          margin-bottom: 20px;
-        }
-        .result-title {
-          font-family: var(--font-display);
-          font-size: 1.2rem; font-weight: 700;
-        }
+        /* TABS */
+        .result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .result-title { font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; }
         .result-file { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
-        .btn-new {
-          background: transparent; border: 1px solid var(--border);
-          color: var(--muted); padding: 8px 18px;
-          border-radius: 100px; font-family: var(--font-body);
-          font-size: 0.8rem; cursor: pointer; transition: all 0.2s;
-        }
+        .btn-new { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 8px 18px; border-radius: 100px; font-family: var(--font-body); font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
         .btn-new:hover { border-color: #444; color: var(--text); }
-        .summary-box {
+
+        .tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+        .tab-btn { background: none; border: none; padding: 10px 20px; font-family: var(--font-body); font-size: 0.9rem; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; }
+        .tab-btn.active { color: var(--lime); border-bottom-color: var(--lime); }
+
+        /* SUMMARY */
+        .summary-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
+        .summary-label { font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; color: var(--lime); margin-bottom: 16px; }
+        .summary-text { font-size: 0.95rem; line-height: 1.8; color: var(--text); white-space: pre-wrap; }
+
+        /* FLASHCARD BTN */
+        .btn-generate {
+          width: 100%; padding: 14px; background: transparent;
+          border: 1px dashed rgba(200,241,53,0.3); border-radius: 12px;
+          color: var(--lime); font-family: var(--font-body); font-size: 0.9rem;
+          cursor: pointer; transition: all 0.2s; margin-top: 16px;
+        }
+        .btn-generate:hover { background: rgba(200,241,53,0.05); border-color: var(--lime); }
+        .btn-generate:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* FLASHCARD */
+        .fc-progress { display: flex; gap: 4px; margin-bottom: 20px; }
+        .fc-dot { height: 4px; flex: 1; border-radius: 2px; background: var(--border); transition: background 0.3s; }
+        .fc-dot.done-known { background: var(--lime); }
+        .fc-dot.done-unknown { background: #ff5050; }
+        .fc-dot.current { background: #555; }
+
+        .flashcard {
           background: var(--surface); border: 1px solid var(--border);
-          border-radius: 16px; padding: 28px;
+          border-radius: 20px; padding: 48px 32px;
+          text-align: center; min-height: 220px;
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          cursor: pointer; transition: all 0.2s; position: relative;
         }
-        .summary-label {
-          font-size: 0.7rem; letter-spacing: 2px;
-          text-transform: uppercase; color: var(--lime);
-          margin-bottom: 16px;
-        }
-        .summary-text {
-          font-size: 0.95rem; line-height: 1.8;
-          color: var(--text); white-space: pre-wrap;
-        }
+        .flashcard:hover { border-color: #333; }
+        .fc-counter { font-size: 0.75rem; color: var(--muted); margin-bottom: 16px; }
+        .fc-type { font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; color: var(--lime); margin-bottom: 16px; }
+        .fc-text { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; letter-spacing: -0.5px; line-height: 1.3; }
+        .fc-hint { font-size: 0.78rem; color: var(--muted); margin-top: 20px; }
+
+        .fc-actions { display: flex; gap: 12px; margin-top: 16px; }
+        .fc-btn { flex: 1; padding: 14px; border-radius: 12px; border: none; font-family: var(--font-body); font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+        .fc-btn.wrong { background: rgba(255,80,80,0.1); color: #ff5050; border: 1px solid rgba(255,80,80,0.2); }
+        .fc-btn.wrong:hover { background: rgba(255,80,80,0.2); }
+        .fc-btn.right { background: rgba(200,241,53,0.1); color: var(--lime); border: 1px solid rgba(200,241,53,0.2); }
+        .fc-btn.right:hover { background: rgba(200,241,53,0.2); }
+
+        /* RISULTATO FINALE */
+        .fc-result { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 48px; text-align: center; }
+        .fc-result h3 { font-family: var(--font-display); font-size: 2rem; font-weight: 700; letter-spacing: -1px; margin-bottom: 8px; }
+        .fc-result p { color: var(--muted); margin-bottom: 24px; }
+        .fc-score { font-family: var(--font-display); font-size: 4rem; font-weight: 700; color: var(--lime); }
+        .btn-restart { background: var(--lime); color: #000; border: none; padding: 12px 28px; border-radius: 100px; font-family: var(--font-body); font-size: 0.9rem; font-weight: 500; cursor: pointer; margin-top: 8px; }
       `}</style>
 
       <div className="page">
@@ -210,13 +255,7 @@ export default function Dashboard() {
             <div className="upload-subtitle">Trascina qui il file oppure clicca per sceglierlo</div>
             <button className="btn-upload">Scegli PDF</button>
             <div className="upload-note">PDF · Max 10MB · Fino a 15 pagine (piano Free)</div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf"
-              style={{ display: "none" }}
-              onChange={(e) => handleFile(e.target.files[0])}
-            />
+            <input ref={fileInputRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={(e) => handleFile(e.target.files[0])} />
           </div>
         )}
 
@@ -228,18 +267,91 @@ export default function Dashboard() {
         )}
 
         {result && (
-          <div className="result">
+          <div>
             <div className="result-header">
               <div>
-                <div className="result-title">Riassunto generato ✨</div>
+                <div className="result-title">Documento analizzato ✨</div>
                 <div className="result-file">📄 {result.fileName}</div>
               </div>
-              <button className="btn-new" onClick={() => setResult(null)}>+ Nuovo documento</button>
+              <button className="btn-new" onClick={() => { setResult(null); setFlashcards([]); fileRef.current = null; }}>+ Nuovo</button>
             </div>
-            <div className="summary-box">
-              <div className="summary-label">⚡ Riassunto AI</div>
-              <div className="summary-text">{result.summary}</div>
+
+            <div className="tabs">
+              <button className={`tab-btn ${activeTab === "summary" ? "active" : ""}`} onClick={() => setActiveTab("summary")}>📝 Riassunto</button>
+              <button className={`tab-btn ${activeTab === "flashcards" ? "active" : ""}`} onClick={() => setActiveTab("flashcards")}>🃏 Flashcard</button>
             </div>
+
+            {activeTab === "summary" && (
+              <div>
+                <div className="summary-box">
+                  <div className="summary-label">⚡ Riassunto AI</div>
+                  <div className="summary-text">{result.summary}</div>
+                </div>
+                <button
+                  className="btn-generate"
+                  onClick={handleGenerateFlashcards}
+                  disabled={loadingFlashcards}
+                >
+                  {loadingFlashcards ? "⏳ Generando flashcard..." : "🃏 Genera flashcard da questo documento"}
+                </button>
+              </div>
+            )}
+
+            {activeTab === "flashcards" && (
+              <div>
+                {loadingFlashcards && (
+                  <div className="loading">
+                    <div className="spinner"></div>
+                    <p>Generando le flashcard...</p>
+                  </div>
+                )}
+
+                {!loadingFlashcards && flashcards.length === 0 && (
+                  <div className="summary-box" style={{textAlign: "center"}}>
+                    <p style={{color: "var(--muted)", marginBottom: 16}}>Nessuna flashcard ancora generata.</p>
+                    <button className="btn-generate" onClick={handleGenerateFlashcards}>🃏 Genera flashcard</button>
+                  </div>
+                )}
+
+                {!loadingFlashcards && flashcards.length > 0 && !isLastCard && (
+                  <div>
+                    <div className="fc-progress">
+                      {flashcards.map((_, i) => {
+                        const k = known.find(k => k.index === i);
+                        return (
+                          <div key={i} className={`fc-dot ${k ? (k.known ? "done-known" : "done-unknown") : i === currentCard ? "current" : ""}`}></div>
+                        );
+                      })}
+                    </div>
+                    <div className="flashcard" onClick={() => setFlipped(!flipped)}>
+                      <div className="fc-counter">{currentCard + 1} / {flashcards.length}</div>
+                      <div className="fc-type">{flipped ? "RISPOSTA" : "DOMANDA"}</div>
+                      <div className="fc-text">
+                        {flipped ? flashcards[currentCard].risposta : flashcards[currentCard].domanda}
+                      </div>
+                      {!flipped && <div className="fc-hint">Clicca per vedere la risposta</div>}
+                    </div>
+                    {flipped && (
+                      <div className="fc-actions">
+                        <button className="fc-btn wrong" onClick={() => handleKnown(false)}>✗ Non sapevo</button>
+                        <button className="fc-btn right" onClick={() => handleKnown(true)}>✓ Sapevo</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!loadingFlashcards && flashcards.length > 0 && isLastCard && (
+                  <div className="fc-result">
+                    <div className="fc-score">{knownCards}/{flashcards.length}</div>
+                    <h3>Sessione completata!</h3>
+                    <p>Hai risposto correttamente a {knownCards} domande su {flashcards.length}.</p>
+                    <button className="btn-restart" onClick={() => { setCurrentCard(0); setKnown([]); setFlipped(false); }}>
+                      🔄 Riprova
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
