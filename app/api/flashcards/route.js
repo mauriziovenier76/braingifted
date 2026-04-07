@@ -34,13 +34,10 @@ export async function POST(request) {
         messages: [
           {
             role: "user",
-            content: `Sei un assistente di studio. Dal testo seguente estrai i concetti chiave e crea esattamente 10 flashcard domanda/risposta in italiano.
+            content: `Sei un assistente di studio. Dal testo seguente crea 10 flashcard domanda/risposta in italiano.
 
-Rispondi SOLO con un JSON valido, senza testo aggiuntivo, in questo formato:
-[
-  {"domanda": "...", "risposta": "..."},
-  {"domanda": "...", "risposta": "..."}
-]
+Rispondi SOLO con un array JSON, senza markdown, senza backtick, senza spiegazioni. Solo JSON puro:
+[{"domanda":"...","risposta":"..."},{"domanda":"...","risposta":"..."}]
 
 Testo:
 ${trimmedText}`,
@@ -50,12 +47,24 @@ ${trimmedText}`,
     });
 
     if (!response.ok) {
+      const errData = await response.json();
+      console.error("Anthropic error:", errData);
       return NextResponse.json({ error: "Errore API AI" }, { status: 500 });
     }
 
     const data = await response.json();
-    const raw = data.content[0].text;
-    const flashcards = JSON.parse(raw);
+    let raw = data.content[0].text.trim();
+
+    // Rimuove eventuali backtick o markdown
+    raw = raw.replace(/```json/g, "").replace(/```/g, "").trim();
+
+    // Estrae solo la parte JSON
+    const start = raw.indexOf("[");
+    const end = raw.lastIndexOf("]");
+    if (start === -1 || end === -1) throw new Error("JSON non trovato nella risposta");
+    const jsonStr = raw.slice(start, end + 1);
+
+    const flashcards = JSON.parse(jsonStr);
     return NextResponse.json({ flashcards });
 
   } catch (err) {
