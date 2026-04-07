@@ -19,6 +19,9 @@ export default function Dashboard() {
   const [loadingQuiz, setLoadingQuiz] = useState(false);
   const [answers, setAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [explanation, setExplanation] = useState("");
+  const [explainText, setExplainText] = useState("");
+  const [loadingExplain, setLoadingExplain] = useState(false);
   const fileRef = useRef(null);
   const fileInputRef = useRef();
   const supabase = createClient();
@@ -104,6 +107,29 @@ export default function Dashboard() {
   const handleSubmitQuiz = () => setSubmitted(true);
 
   const quizScore = submitted ? questions.filter((q, i) => answers[i] === q.corretta).length : 0;
+
+  const handleExplain = async () => {
+  if (!explainText || explainText.trim().length < 20) {
+    setError("Inserisci almeno una frase da spiegare.");
+    return;
+  }
+  setLoadingExplain(true);
+  setExplanation("");
+  try {
+    const response = await fetch("/api/explain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: explainText }),
+    });
+    if (!response.ok) throw new Error("Errore nella spiegazione.");
+    const data = await response.json();
+    setExplanation(data.explanation);
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setLoadingExplain(false);
+  }
+};
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -254,6 +280,7 @@ export default function Dashboard() {
               <button className={`tab-btn ${activeTab === "summary" ? "active" : ""}`} onClick={() => setActiveTab("summary")}>📝 Riassunto</button>
               <button className={`tab-btn ${activeTab === "flashcards" ? "active" : ""}`} onClick={() => setActiveTab("flashcards")}>🃏 Flashcard</button>
               <button className={`tab-btn ${activeTab === "quiz" ? "active" : ""}`} onClick={() => setActiveTab("quiz")}>🧠 Quiz</button>
+              <button className={`tab-btn ${activeTab === "explain" ? "active" : ""}`} onClick={() => setActiveTab("explain")}>💡 Spiegazioni</button>
             </div>
 
             {activeTab === "summary" && (
@@ -364,6 +391,51 @@ export default function Dashboard() {
                         </button>
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "explain" && (
+              <div>
+                <div className="summary-box" style={{marginBottom: 16}}>
+                  <div className="summary-label">💡 Spiegami semplice</div>
+                  <p style={{color: "var(--muted)", fontSize: "0.9rem", marginBottom: 16}}>
+                    Incolla un paragrafo difficile e BrainGifted lo spiegherà in modo semplice con esempi pratici.
+                  </p>
+                  <textarea
+                    value={explainText}
+                    onChange={(e) => setExplainText(e.target.value)}
+                    placeholder="Incolla qui il testo che vuoi capire meglio..."
+                    style={{
+                      width: "100%", minHeight: 140, padding: "14px 16px",
+                      background: "#0a0a0a", border: "1px solid var(--border)",
+                      borderRadius: 12, color: "var(--text)", fontFamily: "var(--font-body)",
+                      fontSize: "0.9rem", resize: "vertical", outline: "none",
+                      lineHeight: 1.6,
+                    }}
+                  />
+                  <button
+                    className="btn-generate"
+                    onClick={handleExplain}
+                    disabled={loadingExplain || explainText.trim().length < 20}
+                    style={{marginTop: 12}}
+                  >
+                    {loadingExplain ? "⏳ Spiegando..." : "💡 Spiegamelo semplice"}
+                  </button>
+                </div>
+
+                {loadingExplain && (
+                  <div className="loading">
+                    <div className="spinner"></div>
+                    <p>Sto elaborando una spiegazione semplice...</p>
+                  </div>
+                )}
+
+                {explanation && !loadingExplain && (
+                  <div className="summary-box">
+                    <div className="summary-label">✨ Spiegazione</div>
+                    <div className="summary-text">{explanation}</div>
                   </div>
                 )}
               </div>
