@@ -144,6 +144,7 @@ export default function Dashboard() {
     <>
       <style>{`
         @import url('https://api.fontshare.com/v2/css?f[]=clash-display@600,700&f[]=satoshi@300,400,500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
           --lime: #c8f135; --bg: #0a0a0a; --surface: #111111; --surface2: #1a1a1a;
@@ -195,7 +196,7 @@ export default function Dashboard() {
         .flashcard:hover { border-color: #333; }
         .fc-counter { font-size: 0.75rem; color: var(--muted); margin-bottom: 16px; }
         .fc-type { font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; color: var(--lime); margin-bottom: 16px; }
-        .fc-text { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; letter-spacing: -0.5px; line-height: 1.3; }
+        .fc-text { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.1rem; font-weight: 500; letter-spacing: 0; line-height: 1.6; }
         .fc-hint { font-size: 0.78rem; color: var(--muted); margin-top: 20px; }
         .fc-actions { display: flex; gap: 12px; margin-top: 16px; }
         .fc-btn { flex: 1; padding: 14px; border-radius: 12px; border: none; font-family: var(--font-body); font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
