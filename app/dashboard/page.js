@@ -131,6 +131,21 @@ export default function Dashboard() {
   }
 };
 
+const handleUpgradeToPro = async () => {
+  try {
+    const response = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, email: user.email }),
+    });
+    const data = await response.json();
+    if (data.url) window.location.href = data.url;
+  } catch (err) {
+    setError("Errore nel checkout. Riprova.");
+  }
+};
+
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/");
@@ -235,7 +250,17 @@ export default function Dashboard() {
       <div className="page">
         <div className="header">
           <div className="logo">Brain<span>Gifted</span></div>
-          <button className="btn-logout" onClick={handleLogout}>Esci</button>
+          <div style={{display:"flex", gap:12, alignItems:"center"}}>
+            <button onClick={handleUpgradeToPro} style={{
+              background: "var(--lime)", color: "#000", border: "none",
+              padding: "8px 20px", borderRadius: "100px",
+              fontFamily: "var(--font-body)", fontSize: "0.85rem",
+              fontWeight: 500, cursor: "pointer", transition: "all 0.2s"
+            }}>
+              ⚡ Passa a Pro
+            </button>
+            <button className="btn-logout" onClick={handleLogout}>Esci</button>
+          </div>
         </div>
 
         <h1>Ciao! 👋</h1>
