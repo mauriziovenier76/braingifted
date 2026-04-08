@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [explanation, setExplanation] = useState("");
   const [explainText, setExplainText] = useState("");
   const [loadingExplain, setLoadingExplain] = useState(false);
+  const [plan, setPlan] = useState("free");
   const fileRef = useRef(null);
   const fileInputRef = useRef();
   const supabase = createClient();
@@ -30,10 +31,26 @@ export default function Dashboard() {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) router.push("/login");
-      else setUser(user);
+      if (!user) {
+        router.push("/login");
+      } else {
+        setUser(user);
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("plan")
+          .eq("id", user.id)
+          .single();
+        if (profile) setPlan(profile.plan);
+      }
     };
     getUser();
+  }, []);
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("success") === "true") {
+      window.history.replaceState({}, "", "/dashboard");
+    }
   }, []);
 
   const handleFile = async (file) => {
@@ -251,14 +268,25 @@ const handleUpgradeToPro = async () => {
         <div className="header">
           <div className="logo">Brain<span>Gifted</span></div>
           <div style={{display:"flex", gap:12, alignItems:"center"}}>
-            <button onClick={handleUpgradeToPro} style={{
-              background: "var(--lime)", color: "#000", border: "none",
-              padding: "8px 20px", borderRadius: "100px",
-              fontFamily: "var(--font-body)", fontSize: "0.85rem",
-              fontWeight: 500, cursor: "pointer", transition: "all 0.2s"
-            }}>
-              ⚡ Passa a Pro
-            </button>
+            {plan === "pro" ? (
+              <span style={{
+                background: "rgba(200,241,53,0.1)", color: "var(--lime)",
+                border: "1px solid rgba(200,241,53,0.3)",
+                padding: "8px 20px", borderRadius: "100px",
+                fontSize: "0.85rem", fontWeight: 500,
+              }}>
+                ⚡ Piano Pro
+              </span>
+            ) : (
+              <button onClick={handleUpgradeToPro} style={{
+                background: "var(--lime)", color: "#000", border: "none",
+                padding: "8px 20px", borderRadius: "100px",
+                fontFamily: "var(--font-body)", fontSize: "0.85rem",
+                fontWeight: 500, cursor: "pointer",
+              }}>
+                ⚡ Passa a Pro
+              </button>
+            )}
             <button className="btn-logout" onClick={handleLogout}>Esci</button>
           </div>
         </div>
@@ -280,7 +308,11 @@ const handleUpgradeToPro = async () => {
             <div className="upload-title">Carica il tuo documento</div>
             <div className="upload-subtitle">Trascina qui il file oppure clicca per sceglierlo</div>
             <button className="btn-upload">Scegli PDF</button>
-            <div className="upload-note">PDF · Max 10MB · Fino a 15 pagine (piano Free)</div>
+            <div className="upload-note">
+              {plan === "pro"
+                ? "PDF · Max 10MB · Pagine illimitate · Piano Pro ⚡"
+                : "PDF · Max 10MB · Fino a 15 pagine · Piano Free"}
+            </div>
             <input ref={fileInputRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={(e) => handleFile(e.target.files[0])} />
           </div>
         )}
