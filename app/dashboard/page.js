@@ -23,6 +23,9 @@ export default function Dashboard() {
   const [explainText, setExplainText] = useState("");
   const [loadingExplain, setLoadingExplain] = useState(false);
   const [plan, setPlan] = useState("free");
+  const [slides, setSlides] = useState([]);
+  const [loadingSlides, setLoadingSlides] = useState(false);
+  const [exportingPptx, setExportingPptx] = useState(false);
   const fileRef = useRef(null);
   const fileInputRef = useRef();
   const supabase = createClient();
@@ -162,6 +165,49 @@ const handleUpgradeToPro = async () => {
   }
 };
 
+const handleGenerateSlides = async () => {
+  if (!fileRef.current) return;
+  setLoadingSlides(true);
+  setSlides([]);
+  try {
+    const formData = new FormData();
+    formData.append("file", fileRef.current);
+    formData.append("plan", plan);
+    const response = await fetch("/api/slides", { method: "POST", body: formData });
+    if (!response.ok) throw new Error("Errore nella generazione delle slide.");
+    const data = await response.json();
+    setSlides(data.slides);
+    setActiveTab("slides");
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setLoadingSlides(false);
+  }
+};
+
+const handleExportPptx = async () => {
+  if (!slides.length) return;
+  setExportingPptx(true);
+  try {
+    const response = await fetch("/api/export-pptx", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slides, title: result?.fileName }),
+    });
+    if (!response.ok) throw new Error("Errore nell'export.");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "braingifted-presentazione.pptx";
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setExportingPptx(false);
+  }
+};
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -339,6 +385,7 @@ const handleUpgradeToPro = async () => {
               <button className={`tab-btn ${activeTab === "flashcards" ? "active" : ""}`} onClick={() => setActiveTab("flashcards")}>🃏 Flashcard</button>
               <button className={`tab-btn ${activeTab === "quiz" ? "active" : ""}`} onClick={() => setActiveTab("quiz")}>🧠 Quiz</button>
               <button className={`tab-btn ${activeTab === "explain" ? "active" : ""}`} onClick={() => setActiveTab("explain")}>💡 Spiegazioni</button>
+              <button className={`tab-btn ${activeTab === "slides" ? "active" : ""}`} onClick={() => setActiveTab("slides")}>🎤 Discorso</button>
             </div>
 
             {activeTab === "summary" && (
@@ -494,6 +541,103 @@ const handleUpgradeToPro = async () => {
                   <div className="summary-box">
                     <div className="summary-label">✨ Spiegazione</div>
                     <div className="summary-text">{explanation}</div>
+                  </div>
+                )}
+              </div>
+            )}
+            {activeTab === "slides" && (
+              <div>
+                {loadingSlides && (
+                  <div className="loading">
+                    <div className="spinner"></div>
+                    <p>Generando la struttura del discorso...</p>
+                  </div>
+                )}
+
+                {!loadingSlides && slides.length === 0 && (
+                  <div className="summary-box" style={{textAlign:"center"}}>
+                    <p style={{color:"var(--muted)", marginBottom:8}}>
+                      {plan === "pro" ? "10 slide con 5 punti chiave + export PowerPoint ⚡" : "7 slide con 3 punti chiave per il piano Free"}
+                    </p>
+                    <button className="btn-generate" onClick={handleGenerateSlides}>🎤 Genera struttura discorso</button>
+                  </div>
+                )}
+
+                {!loadingSlides && slides.length > 0 && (
+                  <div>
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20}}>
+                      <div style={{fontSize:"0.8rem", color:"var(--muted)"}}>
+                        {slides.length} slide generate
+                      </div>
+                      <div style={{display:"flex", gap:8}}>
+                        {plan === "pro" ? (
+                          <button onClick={handleExportPptx} disabled={exportingPptx} style={{
+                            background:"var(--lime)", color:"#000", border:"none",
+                            padding:"8px 20px", borderRadius:"100px",
+                            fontFamily:"var(--font-body)", fontSize:"0.85rem",
+                            fontWeight:500, cursor:"pointer"
+                          }}>
+                            {exportingPptx ? "⏳ Esportando..." : "⬇️ Scarica PowerPoint"}
+                          </button>
+                        ) : (
+                          <button onClick={handleUpgradeToPro} style={{
+                            background:"transparent", border:"1px solid rgba(200,241,53,0.3)",
+                            color:"var(--lime)", padding:"8px 20px", borderRadius:"100px",
+                            fontFamily:"var(--font-body)", fontSize:"0.85rem", cursor:"pointer"
+                          }}>
+                            ⚡ Pro per scaricare il PowerPoint
+                          </button>
+                        )}
+                        <button className="btn-new" onClick={() => setSlides([])}>↺ Rigenera</button>
+                      </div>
+                    </div>
+
+                    <div style={{display:"flex", flexDirection:"column", gap:16}}>
+                      {slides.map((slide, i) => (
+                        <div key={i} style={{
+                          background: slide.tipo === "apertura" || slide.tipo === "chiusura" ? "var(--bg)" : "var(--surface)",
+                          border: `1px solid ${slide.tipo === "apertura" || slide.tipo === "chiusura" ? "rgba(200,241,53,0.2)" : "var(--border)"}`,
+                          borderRadius:16, padding:"24px 28px",
+                          borderLeft: `3px solid var(--lime)`
+                        }}>
+                          <div style={{fontSize:"0.7rem", letterSpacing:2, textTransform:"uppercase", color:"var(--lime)", marginBottom:10}}>
+                            {slide.tipo === "apertura" ? "🎬 Apertura" : slide.tipo === "chiusura" ? "🎯 Chiusura" : `📌 Slide ${i}`}
+                          </div>
+                          <div style={{fontFamily:"var(--font-display)", fontSize:"1.2rem", fontWeight:700, marginBottom:12}}>
+                            {slide.titolo}
+                          </div>
+
+                          {slide.tipo === "apertura" && (
+                            <>
+                              <div style={{color:"var(--muted)", fontSize:"0.9rem", marginBottom:8}}>{slide.sottotitolo}</div>
+                              <div style={{background:"rgba(200,241,53,0.06)", border:"1px solid rgba(200,241,53,0.15)", borderRadius:8, padding:"10px 14px", fontSize:"0.875rem", color:"var(--lime)", fontStyle:"italic"}}>
+                                "{slide.hook}"
+                              </div>
+                            </>
+                          )}
+
+                          {slide.tipo === "contenuto" && (
+                            <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                              {(slide.punti || []).map((punto, j) => (
+                                <div key={j} style={{display:"flex", gap:10, alignItems:"flex-start"}}>
+                                  <div style={{width:8, height:8, borderRadius:"50%", background:"var(--lime)", flexShrink:0, marginTop:6}}></div>
+                                  <div style={{fontSize:"0.9rem", color:"var(--muted)", lineHeight:1.5}}>{punto}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {slide.tipo === "chiusura" && (
+                            <>
+                              <div style={{color:"var(--muted)", fontSize:"0.9rem", marginBottom:12}}>{slide.messaggio}</div>
+                              <div style={{background:"var(--lime)", borderRadius:8, padding:"10px 16px", fontSize:"0.875rem", color:"#000", fontWeight:600, textAlign:"center"}}>
+                                {slide.cta}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
