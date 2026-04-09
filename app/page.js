@@ -702,7 +702,7 @@ export default function Home() {
         <div className="cta-inner">
           <h2>Pronto a studiare in modo più intelligente?</h2>
           <p>Unisciti a migliaia di studenti che usano BrainGifted per prepararsi meglio, in meno tempo.</p>
-          <button className="btn-primary">Inizia gratis — nessuna carta richiesta</button>
+          <a href="/signup" className="btn-pricing solid">Inizia gratis — nessuna carta richiesta</a>
         </div>
       </div>
 
