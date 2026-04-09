@@ -703,7 +703,9 @@ export default function Home() {
         <div className="cta-inner">
           <h2>Pronto a studiare in modo più intelligente?</h2>
           <p>Unisciti a migliaia di studenti che usano BrainGifted per prepararsi meglio, in meno tempo.</p>
-          <a href="/signup" className="btn-primary" style={{display:"inline-block"}}>Inizia gratis — nessuna carta richiesta</a>
+          <button className="btn-primary" onClick={() => window.location.href = "/signup"}>
+            Inizia gratis — nessuna carta richiesta
+          </button>
         </div>
       </div>
 
