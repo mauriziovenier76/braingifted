@@ -2,8 +2,34 @@
 import { useState, useEffect } from "react";
 
 export default function Home() {
+  const [randomQuiz, setRandomQuiz] = useState(0);
+  const [randomFlash, setRandomFlash] = useState(0);  
   const [scrolled, setScrolled] = useState(false);
   const [activeTab, setActiveTab] = useState("summary");
+
+  const quizPool = [
+    { q: "Quale articolo disciplina la responsabilità contrattuale?", opts: ["Art. 1218 c.c.", "Art. 2043 c.c.", "Art. 1321 c.c.", "Art. 1372 c.c."], correct: 0 },
+    { q: "In quale anno fu promulgata la Costituzione italiana?", opts: ["1946", "1947", "1948", "1950"], correct: 2 },
+    { q: "Chi scrisse 'I Promessi Sposi'?", opts: ["Dante Alighieri", "Giovanni Boccaccio", "Alessandro Manzoni", "Giacomo Leopardi"], correct: 2 },
+    { q: "Qual è la formula della velocità?", opts: ["v = a × t", "v = s / t", "v = F / m", "v = m × a"], correct: 1 },
+    { q: "Quale organo produce l'insulina?", opts: ["Fegato", "Reni", "Pancreas", "Milza"], correct: 2 },
+  ];
+
+  const flashPool = [
+    { q: "Cos'è la responsabilità contrattuale?", a: "Obbligo di risarcire il danno da inadempimento contrattuale." },
+    { q: "Cos'è la fotosintesi clorofilliana?", a: "Processo con cui le piante convertono luce solare in energia chimica." },
+    { q: "Cosa afferma il principio di inerzia?", a: "Un corpo rimane in quiete o in moto rettilineo uniforme se non agisce su di esso una forza." },
+    { q: "Chi era Napoleone Bonaparte?", a: "Generale e imperatore francese, protagonista delle guerre napoleoniche (1769-1821)." },
+    { q: "Cos'è il PIL?", a: "Prodotto Interno Lordo: valore totale dei beni e servizi prodotti in un paese in un anno." },
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRandomQuiz(prev => (prev + 1) % quizPool.length);
+      setRandomFlash(prev => (prev + 1) % flashPool.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40);
@@ -535,19 +561,15 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="tab-visual">
-                  <div className="visual-doc">
-                    <div className="visual-doc-title">📄 Diritto Privato — Cap. 3.pdf</div>
-                    <div className="visual-lines">
-                      <div className="visual-line lime"></div>
-                      <div className="visual-line w80"></div>
-                      <div className="visual-line w90"></div>
-                      <div className="visual-line w60"></div>
-                      <div className="visual-line w80"></div>
-                      <div className="visual-line w40"></div>
+                  <div className="quiz-item">
+                    <div className="quiz-q">{quizPool[randomQuiz].q}</div>
+                    <div className="quiz-options">
+                      {quizPool[randomQuiz].opts.map((opt, i) => (
+                        <div key={i} className={`quiz-opt ${i === quizPool[randomQuiz].correct ? "correct" : ""}`}>
+                          {i === quizPool[randomQuiz].correct ? "✓ " : ""}{opt}
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                  <div style={{marginTop: 16, fontSize: "0.75rem", color: "var(--lime)", display: "flex", alignItems: "center", gap: 8}}>
-                    <span>⚡</span> Riassunto generato in 3 secondi
                   </div>
                 </div>
               </>
@@ -565,9 +587,9 @@ export default function Home() {
                 </div>
                 <div className="tab-visual">
                   <div className="flashcard">
-                    <div className="flashcard-q">FLASHCARD 1 di 24</div>
-                    <div className="flashcard-text">Cos'è la responsabilità contrattuale?</div>
-                    <div style={{fontSize: "0.8rem", color: "var(--muted)", marginBottom: 16}}>Obbligo di risarcire il danno derivante dall'inadempimento di un'obbligazione contrattuale.</div>
+                    <div className="flashcard-q">FLASHCARD {randomFlash + 1} di {flashPool.length}</div>
+                    <div className="flashcard-text">{flashPool[randomFlash].q}</div>
+                    <div style={{fontSize:"0.8rem", color:"var(--muted)", marginBottom:16}}>{flashPool[randomFlash].a}</div>
                     <div className="flashcard-btns">
                       <button className="fc-btn wrong">✗ Non so</button>
                       <button className="fc-btn right">✓ So</button>
