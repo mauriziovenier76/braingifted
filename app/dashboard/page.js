@@ -59,9 +59,17 @@ export default function Dashboard() {
   const handleFile = async (file) => {
     if (!file || file.type !== "application/pdf") { setError("Per ora accettiamo solo file PDF."); return; }
     if (file.size > 10 * 1024 * 1024) { setError("Il file è troppo grande. Massimo 10MB."); return; }
+
+    const usage = await checkUsage("summary");
+    if (!usage.allowed) {
+      if (usage.reason === "limit_reached") setError(`Hai raggiunto il limite di ${usage.limit} riassunti/mese del piano Free. Passa a Pro per continuare!`);
+      if (usage.reason === "pro_only") setError("Questa funzione è disponibile solo per il piano Pro.");
+      return;
+    }
+
     fileRef.current = file;
     setUploading(true); setError(""); setResult(null);
-    setFlashcards([]); setQuestions([]); setCurrentCard(0); setKnown([]);
+    setFlashcards([]); setQuestions([]); setSlides([]); setCurrentCard(0); setKnown([]);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -79,6 +87,14 @@ export default function Dashboard() {
 
   const handleGenerateFlashcards = async () => {
     if (!fileRef.current) return;
+
+    const usage = await checkUsage("flashcards");
+    if (!usage.allowed) {
+      if (usage.reason === "limit_reached") setError(`Hai raggiunto il limite di ${usage.limit} flashcard/mese del piano Free. Passa a Pro!`);
+      if (usage.reason === "pro_only") setError("Questa funzione è disponibile solo per il piano Pro.");
+      return;
+    }
+
     setLoadingFlashcards(true); setFlipped(false); setCurrentCard(0); setKnown([]);
     try {
       const formData = new FormData();
@@ -97,6 +113,14 @@ export default function Dashboard() {
 
   const handleGenerateQuiz = async () => {
     if (!fileRef.current) return;
+
+    const usage = await checkUsage("quiz");
+    if (!usage.allowed) {
+      if (usage.reason === "limit_reached") setError(`Hai raggiunto il limite di ${usage.limit} quiz/mese del piano Free. Passa a Pro!`);
+      if (usage.reason === "pro_only") setError("Questa funzione è disponibile solo per il piano Pro.");
+      return;
+    }
+
     setLoadingQuiz(true); setAnswers({}); setSubmitted(false);
     try {
       const formData = new FormData();
@@ -129,27 +153,34 @@ export default function Dashboard() {
   const quizScore = submitted ? questions.filter((q, i) => answers[i] === q.corretta).length : 0;
 
   const handleExplain = async () => {
-  if (!explainText || explainText.trim().length < 20) {
-    setError("Inserisci almeno una frase da spiegare.");
-    return;
-  }
-  setLoadingExplain(true);
-  setExplanation("");
-  try {
-    const response = await fetch("/api/explain", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: explainText }),
-    });
-    if (!response.ok) throw new Error("Errore nella spiegazione.");
-    const data = await response.json();
-    setExplanation(data.explanation);
-  } catch (err) {
-    setError(err.message);
-  } finally {
-    setLoadingExplain(false);
-  }
-};
+    if (!explainText || explainText.trim().length < 20) {
+      setError("Inserisci almeno una frase da spiegare.");
+      return;
+    }
+
+    const usage = await checkUsage("explain");
+    if (!usage.allowed) {
+      if (usage.reason === "limit_reached") setError(`Hai raggiunto il limite del piano Free. Passa a Pro!`);
+      if (usage.reason === "pro_only") setError("Le spiegazioni sono disponibili solo per il piano Pro. Passa a Pro per sbloccarle!");
+      return;
+    }
+
+    setLoadingExplain(true); setExplanation("");
+    try {
+      const response = await fetch("/api/explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: explainText }),
+      });
+      if (!response.ok) throw new Error("Errore nella spiegazione.");
+      const data = await response.json();
+      setExplanation(data.explanation);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingExplain(false);
+    }
+  };
 
 const handleUpgradeToPro = async () => {
   try {
@@ -167,8 +198,15 @@ const handleUpgradeToPro = async () => {
 
 const handleGenerateSlides = async () => {
   if (!fileRef.current) return;
-  setLoadingSlides(true);
-  setSlides([]);
+
+  const usage = await checkUsage("slides");
+  if (!usage.allowed) {
+    if (usage.reason === "limit_reached") setError(`Hai raggiunto il limite di ${usage.limit} presentazioni/mese del piano Free. Passa a Pro!`);
+    if (usage.reason === "pro_only") setError("Questa funzione è disponibile solo per il piano Pro.");
+    return;
+  }
+
+  setLoadingSlides(true); setSlides([]);
   try {
     const formData = new FormData();
     formData.append("file", fileRef.current);
@@ -208,7 +246,16 @@ const handleExportPptx = async () => {
     setExportingPptx(false);
   }
 };
-
+  const checkUsage = async (feature) => {
+    const response = await fetch("/api/usage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, feature }),
+    });
+    const data = await response.json();
+    return data;
+  };
+  
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/");
