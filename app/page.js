@@ -629,7 +629,7 @@ export default function Home() {
                   <p>BrainGifted analizza il documento e genera una struttura completa per una presentazione orale, con slide di apertura, contenuto e chiusura.</p>
                   <div className="tab-perks">
                     <div className="perk"><div className="perk-icon">✦</div>Slide di apertura con hook</div>
-                    <div className="perk"><div className="perk-icon">✦</div>7-10 slide con punti chiave</div>
+                    <div className="perk"><div className="perk-icon">✦</div>5-7 slide (Free) · 10 slide (Pro)</div>
                     <div className="perk"><div className="perk-icon">✦</div>Export PowerPoint (Pro)</div>
                   </div>
                 </div>
