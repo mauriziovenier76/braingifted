@@ -465,7 +465,7 @@ export default function Home() {
         <div className="nav-links">
           <a href="#features">Funzioni</a>
           <a href="#pricing">Prezzi</a>
-          <button className="btn-nav">Inizia gratis</button>
+          <a href="/signup" className="btn-nav">Inizia gratis</a>
         </div>
       </nav>
 
@@ -478,7 +478,7 @@ export default function Home() {
         <h1>Studia <em>meglio</em>,<br />impara di più.</h1>
         <p>Carica i tuoi appunti, PDF o presentazioni. BrainGifted li trasforma in riassunti, flashcard e quiz in secondi.</p>
         <div className="hero-cta">
-          <button className="btn-primary">Inizia gratis →</button>
+          <a href="/signup" className="btn-primary">Inizia gratis →</a>
           <button className="btn-ghost">Scopri come funziona</button>
         </div>
         <div className="hero-stats">
@@ -674,7 +674,7 @@ export default function Home() {
               <div className="pricing-feature disabled"><span className="cross">✗</span> Spiegazione semplificata</div>
               <div className="pricing-feature disabled"><span className="cross">✗</span> Cronologia documenti</div>
             </div>
-            <button className="btn-pricing outline">Inizia gratis</button>
+            <a href="/signup" className="btn-pricing outline">Inizia gratis</a>
           </div>
           {/* PRO */}
           <div className="pricing-card featured">
@@ -692,7 +692,7 @@ export default function Home() {
               <div className="pricing-feature"><span className="check">✓</span> Priorità nel supporto</div>
               <div className="pricing-feature"><span className="check">✓</span> 7 giorni di prova gratuita</div>
             </div>
-            <button className="btn-pricing solid">Prova 7 giorni gratis →</button>
+            <a href="/signup" className="btn-pricing solid">Prova 7 giorni gratis →</a>
           </div>
         </div>
       </section>
