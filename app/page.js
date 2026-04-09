@@ -162,6 +162,7 @@ export default function Home() {
           font-size: 1rem;
           font-weight: 500;
           cursor: pointer;
+          text-decoration: none;
           transition: all 0.2s;
         }
         .btn-primary:hover { background: var(--lime-dark); transform: translateY(-2px); box-shadow: 0 8px 32px rgba(200,241,53,0.25); }
