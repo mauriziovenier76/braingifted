@@ -509,6 +509,7 @@ export default function Home() {
               { id: "flashcard", label: "🃏 Flashcard" },
               { id: "quiz", label: "🧠 Quiz" },
               { id: "explain", label: "💡 Spiegazioni" },
+              { id: "slides", label: "🎤 Discorso" },
             ].map((t) => (
               <button
                 key={t.id}
@@ -617,6 +618,34 @@ export default function Home() {
                       <div style={{fontSize: "0.75rem", color: "var(--lime)", marginBottom: 8}}>⚡ BrainGifted spiega:</div>
                       <div style={{fontSize: "0.85rem", color: "var(--text)"}}>Immagina che tu e due amici abbiate preso in prestito 100€ insieme. Il creditore può chiedere tutti i 100€ anche solo a te — poi tu ti arrangi con gli altri! 💡</div>
                     </div>
+                  </div>
+                </div>
+              </>
+            )}
+            {activeTab === "slides" && (
+              <>
+                <div className="tab-text">
+                  <h3>Struttura il tuo discorso</h3>
+                  <p>BrainGifted analizza il documento e genera una struttura completa per una presentazione orale, con slide di apertura, contenuto e chiusura.</p>
+                  <div className="tab-perks">
+                    <div className="perk"><div className="perk-icon">✦</div>Slide di apertura con hook</div>
+                    <div className="perk"><div className="perk-icon">✦</div>7-10 slide con punti chiave</div>
+                    <div className="perk"><div className="perk-icon">✦</div>Export PowerPoint (Pro)</div>
+                  </div>
+                </div>
+                <div className="tab-visual">
+                  <div style={{display:"flex", flexDirection:"column", gap:10}}>
+                    {[
+                      {label:"🎬 Apertura", title:"Introduzione al tema"},
+                      {label:"📌 Slide 1", title:"Concetto principale"},
+                      {label:"📌 Slide 2", title:"Analisi e dettagli"},
+                      {label:"🎯 Chiusura", title:"Conclusioni e call to action"},
+                    ].map((s, i) => (
+                      <div key={i} style={{background:"var(--surface2)", border:"1px solid var(--border)", borderLeft:"3px solid var(--lime)", borderRadius:8, padding:"10px 14px"}}>
+                        <div style={{fontSize:"0.65rem", color:"var(--lime)", marginBottom:4}}>{s.label}</div>
+                        <div style={{fontSize:"0.85rem", fontWeight:600}}>{s.title}</div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </>
