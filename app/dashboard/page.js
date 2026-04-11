@@ -527,13 +527,42 @@ const handleExportPptx = async () => {
                               </div>
                             )}
                             {r.feature === "quiz" && (
-                              <div style={{fontSize:"0.85rem", color:"var(--muted)"}}>
-                                {r.content.questions?.length} domande salvate
+                              <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                                {r.content.questions?.map((q, i) => (
+                                  <div key={i} style={{background:"var(--surface2)", borderRadius:8, padding:"10px 14px", fontSize:"0.85rem"}}>
+                                    <div style={{color:"var(--text)", marginBottom:6, fontWeight:500}}>{i+1}. {q.domanda}</div>
+                                    <div style={{display:"flex", flexDirection:"column", gap:4}}>
+                                      {q.opzioni?.map((opt, j) => (
+                                        <div key={j} style={{color: j === q.corretta ? "var(--lime)" : "var(--muted)", fontSize:"0.8rem"}}>
+                                          {j === q.corretta ? "✓ " : "  "}{opt}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             )}
                             {r.feature === "slides" && (
-                              <div style={{fontSize:"0.85rem", color:"var(--muted)"}}>
-                                {r.content.slides?.length} slide salvate
+                              <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                                {r.content.slides?.map((slide, i) => (
+                                  <div key={i} style={{background:"var(--surface2)", border:"1px solid var(--border)", borderLeft:"3px solid var(--lime)", borderRadius:8, padding:"10px 14px"}}>
+                                    <div style={{fontSize:"0.65rem", color:"var(--lime)", marginBottom:4}}>
+                                      {slide.tipo === "apertura" ? "🎬 Apertura" : slide.tipo === "chiusura" ? "🎯 Chiusura" : `📌 Slide ${i}`}
+                                    </div>
+                                    <div style={{fontSize:"0.85rem", fontWeight:600, marginBottom:4}}>{slide.titolo}</div>
+                                    {slide.tipo === "contenuto" && (
+                                      <div style={{display:"flex", flexDirection:"column", gap:4}}>
+                                        {slide.punti?.map((punto, j) => (
+                                          <div key={j} style={{fontSize:"0.8rem", color:"var(--muted)", display:"flex", gap:6}}>
+                                            <span style={{color:"var(--lime)"}}>·</span>{punto}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {slide.tipo === "apertura" && <div style={{fontSize:"0.8rem", color:"var(--muted)", fontStyle:"italic"}}>"{slide.hook}"</div>}
+                                    {slide.tipo === "chiusura" && <div style={{fontSize:"0.8rem", color:"var(--muted)"}}>{slide.messaggio}</div>}
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
