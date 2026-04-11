@@ -26,6 +26,10 @@ export default function Dashboard() {
   const [slides, setSlides] = useState([]);
   const [loadingSlides, setLoadingSlides] = useState(false);
   const [exportingPptx, setExportingPptx] = useState(false);
+  const [documents, setDocuments] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState(null);
+  const [view, setView] = useState("upload");
   const fileRef = useRef(null);
   const fileInputRef = useRef();
   const supabase = createClient();
@@ -48,6 +52,10 @@ export default function Dashboard() {
     };
     getUser();
   }, []);
+
+  useEffect(() => {
+    if (user) loadHistory();
+  }, [user, plan]);
   
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -77,6 +85,23 @@ export default function Dashboard() {
       if (!response.ok) throw new Error("Errore nella generazione del riassunto.");
       const data = await response.json();
       setResult({ fileName: file.name, summary: data.summary });
+
+        // Salva nello storico
+        const docResponse = await fetch("/api/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user.id,
+            fileName: file.name,
+            feature: "summary",
+            content: { summary: data.summary },
+          }),
+        });
+        const docData = await docResponse.json();
+        if (docData.document) {
+          setResult({ fileName: file.name, summary: data.summary, documentId: docData.document.id });
+          loadHistory();
+        }
       setActiveTab("summary");
     } catch (err) {
       setError(err.message || "Qualcosa è andato storto.");
@@ -104,6 +129,19 @@ export default function Dashboard() {
       const data = await response.json();
       setFlashcards(data.flashcards);
       setActiveTab("flashcards");
+      if (result?.documentId) {
+        await fetch("/api/documents", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            documentId: result.documentId,
+            userId: user.id,
+            feature: "flashcards",
+            content: { flashcards: data.flashcards },
+          }),
+        });
+        loadHistory();
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -130,6 +168,19 @@ export default function Dashboard() {
       const data = await response.json();
       setQuestions(data.questions);
       setActiveTab("quiz");
+      if (result?.documentId) {
+        await fetch("/api/documents", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            documentId: result.documentId,
+            userId: user.id,
+            feature: "quiz",
+            content: { questions: data.questions },
+          }),
+        });
+        loadHistory();
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -216,6 +267,19 @@ const handleGenerateSlides = async () => {
     const data = await response.json();
     setSlides(data.slides);
     setActiveTab("slides");
+    if (result?.documentId) {
+      await fetch("/api/documents", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentId: result.documentId,
+          userId: user.id,
+          feature: "slides",
+          content: { slides: data.slides },
+        }),
+      });
+      loadHistory();
+    }
   } catch (err) {
     setError(err.message);
   } finally {
@@ -256,6 +320,19 @@ const handleExportPptx = async () => {
     return data;
   };
   
+  const loadHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const response = await fetch(`/api/documents?userId=${user.id}&plan=${plan}`);
+      const data = await response.json();
+      setDocuments(data.documents || []);
+    } catch (err) {
+      console.error("Errore caricamento storico:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/");
@@ -361,22 +438,20 @@ const handleExportPptx = async () => {
         <div className="header">
           <div className="logo">Brain<span>Gifted</span></div>
           <div style={{display:"flex", gap:12, alignItems:"center"}}>
+            <button onClick={() => setView(view === "upload" ? "history" : "upload")} style={{
+              background:"transparent", border:"1px solid var(--border)",
+              color:"var(--muted)", padding:"8px 20px", borderRadius:"100px",
+              fontFamily:"var(--font-body)", fontSize:"0.85rem", cursor:"pointer",
+              transition:"all 0.2s"
+            }}>
+              {view === "upload" ? "📚 Storico" : "⬆️ Nuovo"}
+            </button>
             {plan === "pro" ? (
-              <span style={{
-                background: "rgba(200,241,53,0.1)", color: "var(--lime)",
-                border: "1px solid rgba(200,241,53,0.3)",
-                padding: "8px 20px", borderRadius: "100px",
-                fontSize: "0.85rem", fontWeight: 500,
-              }}>
+              <span style={{background:"rgba(200,241,53,0.1)", color:"var(--lime)", border:"1px solid rgba(200,241,53,0.3)", padding:"8px 20px", borderRadius:"100px", fontSize:"0.85rem", fontWeight:500}}>
                 ⚡ Piano Pro
               </span>
             ) : (
-              <button onClick={handleUpgradeToPro} style={{
-                background: "var(--lime)", color: "#000", border: "none",
-                padding: "8px 20px", borderRadius: "100px",
-                fontFamily: "var(--font-body)", fontSize: "0.85rem",
-                fontWeight: 500, cursor: "pointer",
-              }}>
+              <button onClick={handleUpgradeToPro} style={{background:"var(--lime)", color:"#000", border:"none", padding:"8px 20px", borderRadius:"100px", fontFamily:"var(--font-body)", fontSize:"0.85rem", fontWeight:500, cursor:"pointer"}}>
                 ⚡ Passa a Pro
               </button>
             )}
@@ -388,28 +463,123 @@ const handleExportPptx = async () => {
         <p className="subtitle">Loggato come <span className="email">{user.email}</span></p>
 
         {error && <div className="error-box">⚠️ {error}</div>}
+        
+        {view === "history" && (
+          <div>
+            <h2 style={{fontFamily:"var(--font-display)", fontSize:"1.8rem", fontWeight:700, letterSpacing:"-1px", marginBottom:8}}>
+              I tuoi documenti 📚
+            </h2>
+            <p style={{color:"var(--muted)", marginBottom:32, fontSize:"0.9rem"}}>
+              {plan === "free" ? "Ultimi 3 documenti (piano Free)" : "Tutti i tuoi documenti (piano Pro)"}
+            </p>
 
-        {!uploading && !result && (
-          <div
-            className={`upload-zone ${dragOver ? "drag-over" : ""}`}
-            onClick={() => fileInputRef.current.click()}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
-          >
-            <div className="upload-icon">📄</div>
-            <div className="upload-title">Carica il tuo documento</div>
-            <div className="upload-subtitle">Trascina qui il file oppure clicca per sceglierlo</div>
-            <button className="btn-upload">Scegli PDF</button>
-            <div className="upload-note">
-              {plan === "pro"
-                ? "PDF · Max 10MB · Pagine illimitate · Piano Pro ⚡"
-                : "PDF · Max 10MB · Fino a 15 pagine · Piano Free"}
-            </div>
-            <input ref={fileInputRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={(e) => handleFile(e.target.files[0])} />
+            {loadingHistory && <div className="loading"><div className="spinner"></div><p>Caricando lo storico...</p></div>}
+
+            {!loadingHistory && documents.length === 0 && (
+              <div className="summary-box" style={{textAlign:"center"}}>
+                <p style={{color:"var(--muted)"}}>Nessun documento ancora. Carica il tuo primo PDF!</p>
+              </div>
+            )}
+
+            {!loadingHistory && documents.length > 0 && (
+              <div style={{display:"flex", flexDirection:"column", gap:16}}>
+                {documents.map(doc => (
+                  <div key={doc.id} style={{background:"var(--surface)", border:"1px solid var(--border)", borderRadius:16, padding:"20px 24px", cursor:"pointer", transition:"all 0.2s"}}
+                    onClick={() => {
+                      setSelectedDoc(selectedDoc?.id === doc.id ? null : doc);
+                    }}
+                  >
+                    <div style={{display:"flex", alignItems:"center", justifyContent:"space-between"}}>
+                      <div>
+                        <div style={{fontWeight:600, marginBottom:4}}>📄 {doc.file_name}</div>
+                        <div style={{fontSize:"0.8rem", color:"var(--muted)"}}>
+                          {new Date(doc.created_at).toLocaleDateString("it-IT", {day:"2-digit", month:"long", year:"numeric"})}
+                        </div>
+                      </div>
+                      <div style={{display:"flex", gap:8}}>
+                        {doc.results?.map(r => (
+                          <span key={r.id} style={{fontSize:"0.7rem", background:"rgba(200,241,53,0.1)", color:"var(--lime)", border:"1px solid rgba(200,241,53,0.2)", padding:"4px 10px", borderRadius:"100px"}}>
+                            {r.feature === "summary" ? "📝" : r.feature === "flashcards" ? "🃏" : r.feature === "quiz" ? "🧠" : r.feature === "slides" ? "🎤" : "💡"} {r.feature}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {selectedDoc?.id === doc.id && (
+                      <div style={{marginTop:20, borderTop:"1px solid var(--border)", paddingTop:20}}>
+                        {doc.results?.map(r => (
+                          <div key={r.id} style={{marginBottom:16}}>
+                            <div style={{fontSize:"0.75rem", letterSpacing:2, textTransform:"uppercase", color:"var(--lime)", marginBottom:8}}>
+                              {r.feature === "summary" ? "📝 Riassunto" : r.feature === "flashcards" ? "🃏 Flashcard" : r.feature === "quiz" ? "🧠 Quiz" : r.feature === "slides" ? "🎤 Discorso" : "💡 Spiegazione"}
+                            </div>
+                            {r.feature === "summary" && (
+                              <div style={{fontSize:"0.9rem", lineHeight:1.8, color:"var(--text)", whiteSpace:"pre-wrap"}}>{r.content.summary}</div>
+                            )}
+                            {r.feature === "flashcards" && (
+                              <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                                {r.content.flashcards?.slice(0,3).map((fc, i) => (
+                                  <div key={i} style={{background:"var(--surface2)", borderRadius:8, padding:"10px 14px", fontSize:"0.85rem"}}>
+                                    <div style={{color:"var(--lime)", marginBottom:4}}>D: {fc.domanda}</div>
+                                    <div style={{color:"var(--muted)"}}>R: {fc.risposta}</div>
+                                  </div>
+                                ))}
+                                {r.content.flashcards?.length > 3 && <div style={{fontSize:"0.8rem", color:"var(--muted)"}}>+{r.content.flashcards.length - 3} altre flashcard...</div>}
+                              </div>
+                            )}
+                            {r.feature === "quiz" && (
+                              <div style={{fontSize:"0.85rem", color:"var(--muted)"}}>
+                                {r.content.questions?.length} domande salvate
+                              </div>
+                            )}
+                            {r.feature === "slides" && (
+                              <div style={{fontSize:"0.85rem", color:"var(--muted)"}}>
+                                {r.content.slides?.length} slide salvate
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {plan === "free" && documents.length >= 3 && (
+              <div style={{marginTop:24, background:"rgba(200,241,53,0.05)", border:"1px solid rgba(200,241,53,0.2)", borderRadius:16, padding:"20px 24px", textAlign:"center"}}>
+                <p style={{color:"var(--text)", marginBottom:12}}>Hai raggiunto il limite di 3 documenti nel piano Free.</p>
+                <button onClick={handleUpgradeToPro} style={{background:"var(--lime)", color:"#000", border:"none", padding:"10px 24px", borderRadius:"100px", fontFamily:"var(--font-body)", fontSize:"0.9rem", fontWeight:500, cursor:"pointer"}}>
+                  ⚡ Passa a Pro — storico illimitato
+                </button>
+              </div>
+            )}
           </div>
         )}
 
+        {view === "upload" && (
+          <div>
+            {!uploading && !result && (
+              <div
+                className={`upload-zone ${dragOver ? "drag-over" : ""}`}
+                onClick={() => fileInputRef.current.click()}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
+              >
+                <div className="upload-icon">📄</div>
+                <div className="upload-title">Carica il tuo documento</div>
+                <div className="upload-subtitle">Trascina qui il file oppure clicca per sceglierlo</div>
+                <button className="btn-upload">Scegli PDF</button>
+                <div className="upload-note">
+                  {plan === "pro"
+                    ? "PDF · Max 10MB · Pagine illimitate · Piano Pro ⚡"
+                    : "PDF · Max 10MB · Fino a 15 pagine · Piano Free"}
+                </div>
+                <input ref={fileInputRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={(e) => handleFile(e.target.files[0])} />
+              </div>
+            )}
+          </div>
+        )}  
         {uploading && (
           <div className="loading">
             <div className="spinner"></div>
