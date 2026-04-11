@@ -129,6 +129,7 @@ export default function Dashboard() {
       const data = await response.json();
       setFlashcards(data.flashcards);
       setActiveTab("flashcards");
+      // Salva TUTTE le flashcard nello storico
       if (result?.documentId) {
         await fetch("/api/documents", {
           method: "PUT",
@@ -267,6 +268,9 @@ const handleGenerateSlides = async () => {
     const data = await response.json();
     setSlides(data.slides);
     setActiveTab("slides");
+
+    console.log("DocumentId disponibile:", result?.documentId);
+    console.log("Flashcard da salvare:", data.flashcards?.length);
     if (result?.documentId) {
       await fetch("/api/documents", {
         method: "PUT",
@@ -517,13 +521,12 @@ const handleExportPptx = async () => {
                             )}
                             {r.feature === "flashcards" && (
                               <div style={{display:"flex", flexDirection:"column", gap:8}}>
-                                {r.content.flashcards?.slice(0,3).map((fc, i) => (
+                                {r.content.flashcards?.map((fc, i) => (
                                   <div key={i} style={{background:"var(--surface2)", borderRadius:8, padding:"10px 14px", fontSize:"0.85rem"}}>
                                     <div style={{color:"var(--lime)", marginBottom:4}}>D: {fc.domanda}</div>
                                     <div style={{color:"var(--muted)"}}>R: {fc.risposta}</div>
                                   </div>
                                 ))}
-                                {r.content.flashcards?.length > 3 && <div style={{fontSize:"0.8rem", color:"var(--muted)"}}>+{r.content.flashcards.length - 3} altre flashcard...</div>}
                               </div>
                             )}
                             {r.feature === "quiz" && (
