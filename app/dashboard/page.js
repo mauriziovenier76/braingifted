@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [view, setView] = useState("upload");
   const fileRef = useRef(null);
   const fileInputRef = useRef();
+  const documentIdRef = useRef(null);
   const supabase = createClient();
   const router = useRouter();
 
@@ -99,6 +100,7 @@ export default function Dashboard() {
         });
         const docData = await docResponse.json();
         if (docData.document) {
+          documentIdRef.current = docData.document.id;
           setResult({ fileName: file.name, summary: data.summary, documentId: docData.document.id });
           loadHistory();
         }
@@ -130,12 +132,12 @@ export default function Dashboard() {
       setFlashcards(data.flashcards);
       setActiveTab("flashcards");
       // Salva TUTTE le flashcard nello storico
-      if (result?.documentId) {
+      if (documentIdRef.current) {
         await fetch("/api/documents", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            documentId: result.documentId,
+            documentId: documentIdRef.current,
             userId: user.id,
             feature: "flashcards",
             content: { flashcards: data.flashcards },
@@ -169,12 +171,12 @@ export default function Dashboard() {
       const data = await response.json();
       setQuestions(data.questions);
       setActiveTab("quiz");
-      if (result?.documentId) {
+      if (documentIdRef.current) {
         await fetch("/api/documents", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            documentId: result.documentId,
+            documentId: documentIdRef.current,
             userId: user.id,
             feature: "quiz",
             content: { questions: data.questions },
@@ -271,12 +273,12 @@ const handleGenerateSlides = async () => {
 
     console.log("DocumentId disponibile:", result?.documentId);
     console.log("Flashcard da salvare:", data.flashcards?.length);
-    if (result?.documentId) {
+    if (documentIdRef.current) {
       await fetch("/api/documents", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          documentId: result.documentId,
+          documentId: documentIdRef.current,
           userId: user.id,
           feature: "slides",
           content: { slides: data.slides },
