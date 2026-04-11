@@ -19,6 +19,10 @@ Personal Project (free)
 Name: Maurizio Venier
 Autenticato con GITHUB
 
-STRIPE
+STRIPE (gestirà i pagamenti - per il momento è in versione test)
 Maurizio.venier@outlook.it
 Koala12*Koala12*
+
+RESEND (email di conferma registrazione)
+Loggato con GITHUB
+re_9FXc8sXd_3QYm4P9y6SxDZiWgSK5tv3E1
