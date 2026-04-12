@@ -17,9 +17,9 @@ export default function Signup() {
     setError("");
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) {
-    setError(error.message);
+      setError(error.message);
     } else {
-    router.push("/dashboard");
+      setSuccess(true);
     }
     setLoading(false);
   };
@@ -121,10 +121,21 @@ export default function Signup() {
         <div className="card">
           <a href="/" className="logo">Brain<span>Gifted</span></a>
           {success ? (
-            <div className="success">
-              <div style={{fontSize: "2rem", marginBottom: 16}}>📬</div>
-              <h2>Controlla la tua email!</h2>
-              <p>Ti abbiamo inviato un link di conferma. Clicca sul link per attivare il tuo account.</p>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:"3rem", marginBottom:24}}>📬</div>
+              <h2 style={{fontFamily:"var(--font-display)", fontSize:"1.6rem", fontWeight:700, letterSpacing:"-0.5px", marginBottom:12}}>
+                Controlla la tua email!
+              </h2>
+              <p style={{color:"var(--muted)", fontSize:"0.95rem", lineHeight:1.6, marginBottom:24}}>
+                Abbiamo inviato un link di conferma a <strong style={{color:"var(--lime)"}}>{email}</strong>. Clicca sul link per attivare il tuo account.
+              </p>
+              <div style={{background:"rgba(200,241,53,0.06)", border:"1px solid rgba(200,241,53,0.15)", borderRadius:12, padding:"16px 20px", fontSize:"0.85rem", color:"var(--muted)", textAlign:"left"}}>
+                <div style={{marginBottom:8}}>💡 <strong style={{color:"var(--text)"}}>Non trovi l'email?</strong></div>
+                <div>Controlla la cartella spam o aspetta qualche minuto prima di riprovare.</div>
+              </div>
+              <a href="/login" style={{display:"block", marginTop:24, color:"var(--lime)", fontSize:"0.9rem", textDecoration:"none"}}>
+                Hai già confermato? Accedi →
+              </a>
             </div>
           ) : (
             <>
