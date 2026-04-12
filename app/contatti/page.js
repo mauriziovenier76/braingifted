@@ -5,10 +5,18 @@ export default function Contatti() {
   const [sent, setSent] = useState(false);
   const [form, setForm] = useState({ nome: "", email: "", messaggio: "" });
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.nome || !form.email || !form.messaggio) return;
-    window.location.href = `mailto:info@braingifted.com?subject=Contatto da ${form.nome}&body=${encodeURIComponent(form.messaggio)}%0A%0ADa: ${form.nome} (${form.email})`;
-    setSent(true);
+    
+    const response = await fetch("/api/contact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+
+    if (response.ok) {
+      setSent(true);
+    }
   };
 
   return (
