@@ -425,8 +425,8 @@ export default function Home() {
         <p>© 2026 BrainGifted. Tutti i diritti riservati.</p>
         <div className="footer-links">
           <a href="#">Privacy</a>
-          <a href="#">Termini</a>
-          <a href="#">Contatti</a>
+          <a href="/termini">Termini</a>
+          <a href="/contatti">Contatti</a>
         </div>
       </footer>
     </>
