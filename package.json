@@ -12,6 +12,8 @@
     "@stripe/stripe-js": "^9.1.0",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",
+    "markmap-lib": "^0.18.12",
+    "markmap-view": "^0.18.12",
     "next": "16.2.2",
     "pdfjs-dist": "^5.6.205",
     "pptxgenjs": "^4.0.1",
