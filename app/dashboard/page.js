@@ -534,7 +534,8 @@ export default function Dashboard() {
           --font-display: 'Clash Display', sans-serif; --font-body: 'Satoshi', sans-serif;
         }
         body { background: var(--bg); color: var(--text); font-family: var(--font-body); }
-        .page { min-height: 100vh; padding: 32px 24px; max-width: 860px; margin: 0 auto; }
+        .page { min-height: 100vh; padding: 32px 24px; max-width: 1280px; width: 100%; margin: 0 auto; }
+        @media (min-width: 1500px) { .page { max-width: 1440px; } }
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 48px; flex-wrap: wrap; gap: 12px; }
         .logo { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; }
         .logo span { color: var(--lime); }
@@ -1072,7 +1073,7 @@ export default function Dashboard() {
 
                     {(plan !== "pro" || (mindmapMd && !loadingMindmap)) && (
                       <div style={{ position: "relative", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
-                        <svg ref={mindmapSvgRef} style={{ width: "100%", height: 480, color: "#f0f0f0", filter: plan === "pro" ? "none" : "blur(4px)" }} />
+                        <svg ref={mindmapSvgRef} style={{ width: "100%", height: 600, color: "#f0f0f0", filter: plan === "pro" ? "none" : "blur(4px)" }} />
                         {plan !== "pro" && (
                           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(10,10,10,0.55)", textAlign: "center", padding: 24 }}>
                             <p style={{ fontWeight: 600, marginBottom: 6 }}>🗺️ Mappe mentali dei tuoi documenti</p>
