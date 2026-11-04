@@ -156,7 +156,7 @@ export default function TestMappa() {
     }
   };
 
-  const btn = { background: "#c8f135", border: "none", padding: "10px 24px", borderRadius: 100, cursor: "pointer", marginRight: 8 };
+  const btn = { background: "#c8f135", color: "#000000", border: "none", padding: "10px 24px", borderRadius: 100, cursor: "pointer", marginRight: 8, fontSize: "0.95rem", fontWeight: 600 };
 
   return (
     <div style={{ background: "#0a0a0a", minHeight: "100vh", padding: 24, color: "#f0f0f0", fontFamily: "sans-serif" }}>
