@@ -132,6 +132,7 @@ export default function Dashboard() {
   const [slides, setSlides] = useState([]);
   const [loadingSlides, setLoadingSlides] = useState(false);
   const [exportingPptx, setExportingPptx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
 
   // Mappa mentale
   const [mindmapMd, setMindmapMd] = useState("");
@@ -428,6 +429,42 @@ export default function Dashboard() {
       setError(err.message);
     } finally {
       setExportingPptx(false);
+    }
+  };
+
+  /* ----- Export Word (Pro) ----- */
+  const handleExportWord = async () => {
+    if (!result?.summary) return;
+    if (plan !== "pro") {
+      setError("L'export in Word è disponibile solo per il piano Pro.");
+      return;
+    }
+    setExportingWord(true);
+    try {
+      const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx");
+      const clean = (s) => s.replace(/\*\*(.*?)\*\*/g, "$1").replace(/^#+\s*/, "").trim();
+      const children = [
+        new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: "Riassunto", bold: true })] }),
+        new Paragraph({ children: [new TextRun({ text: result.fileName || "", italics: true, color: "666666" })], spacing: { after: 300 } }),
+      ];
+      result.summary.split("\n").forEach((raw) => {
+        const line = raw.trim();
+        if (!line) return;
+        if (/^#{1,3}\s/.test(line)) {
+          children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text: clean(line), bold: true })], spacing: { before: 240, after: 120 } }));
+        } else if (/^[-•*]\s+/.test(line)) {
+          children.push(new Paragraph({ bullet: { level: 0 }, children: [new TextRun(clean(line.replace(/^[-•*]\s+/, "")))], spacing: { after: 80 } }));
+        } else {
+          children.push(new Paragraph({ children: [new TextRun(clean(line))], spacing: { after: 120 } }));
+        }
+      });
+      const doc = new Document({ sections: [{ children }] });
+      const blob = await Packer.toBlob(doc);
+      download(blob, "braingifted-riassunto.docx");
+    } catch (err) {
+      setError("Errore nell'export in Word.");
+    } finally {
+      setExportingWord(false);
     }
   };
 
@@ -839,6 +876,11 @@ export default function Dashboard() {
                     <div className="summary-box">
                       <div className="summary-label">⚡ Riassunto AI</div>
                       <div className="summary-text">{result.summary}</div>
+                      <div style={{ marginTop: 20 }}>
+                        <button onClick={handleExportWord} disabled={exportingWord} style={{ background: plan === "pro" ? "var(--lime)" : "transparent", color: plan === "pro" ? "#000" : "var(--muted)", border: plan === "pro" ? "none" : "1px solid var(--border)", padding: "8px 20px", borderRadius: "100px", fontFamily: "var(--font-body)", fontSize: "0.85rem", fontWeight: 500, cursor: "pointer" }}>
+                          {exportingWord ? "⏳ Esportando..." : plan === "pro" ? "⬇️ Esporta in Word" : "🔒 Esporta in Word (Pro)"}
+                        </button>
+                      </div>
                     </div>
                     <button className="btn-generate" onClick={handleGenerateFlashcards} disabled={loadingFlashcards}>
                       {loadingFlashcards ? "⏳ Generando flashcard..." : "🃏 Genera flashcard"}
