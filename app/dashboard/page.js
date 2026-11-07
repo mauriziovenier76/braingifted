@@ -98,6 +98,33 @@ function download(blob, name) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+const TAB_INFO = {
+  summary: {
+    icon: "📝", title: "Riassunto", badge: "",
+    text: "Un riassunto chiaro e ordinato del tuo documento, con i concetti principali in evidenza. Perfetto per avere subito il quadro d'insieme prima di iniziare a studiare.",
+  },
+  flashcards: {
+    icon: "🃏", title: "Flashcard", badge: "",
+    text: "Domande e risposte a schede da girare, per ripassare in modo attivo e ricordare di più. Segni cosa sapevi e cosa no, e alla fine vedi il tuo punteggio.",
+  },
+  quiz: {
+    icon: "🧠", title: "Quiz", badge: "",
+    text: "Un quiz a risposta multipla creato dal tuo documento per verificare quanto hai davvero imparato. Rispondi, consegna e scopri subito il risultato.",
+  },
+  explain: {
+    icon: "💡", title: "Spiegazioni", badge: "Pro",
+    text: "Incolla un paragrafo difficile e BrainGifted te lo spiega in modo semplice, con esempi pratici. Ideale per i passaggi che proprio non ti entrano in testa.",
+  },
+  slides: {
+    icon: "🎤", title: "Discorso", badge: "",
+    text: "Trasforma il documento nella struttura di una presentazione o di un'interrogazione: apertura, punti chiave e chiusura. Con il piano Pro hai più slide e l'export in PowerPoint.",
+  },
+  mindmap: {
+    icon: "🗺️", title: "Mappa", badge: "Pro",
+    text: "Una mappa mentale interattiva dei concetti del documento, per vedere come sono collegati tra loro. Con il piano Pro la generi e la scarichi in PNG o SVG.",
+  },
+};
+
 /* ---------------------------- DASHBOARD ---------------------------- */
 
 export default function Dashboard() {
@@ -133,6 +160,7 @@ export default function Dashboard() {
   const [loadingSlides, setLoadingSlides] = useState(false);
   const [exportingPptx, setExportingPptx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
   // Mappa mentale
   const [mindmapMd, setMindmapMd] = useState("");
@@ -147,6 +175,7 @@ export default function Dashboard() {
 
   const fileRef = useRef(null);
   const documentIdRef = useRef(null);
+  const docPromiseRef = useRef(null);
   const fileInputRef = useRef();
   const supabase = createClient();
   const router = useRouter();
@@ -223,7 +252,29 @@ export default function Dashboard() {
   };
 
   const saveResult = async (feature, content) => {
-    if (!documentIdRef.current) return;
+    if (!fileRef.current) return;
+
+    // Il documento nello storico viene creato al primo risultato generato
+    if (!documentIdRef.current) {
+      if (!docPromiseRef.current) {
+        docPromiseRef.current = (async () => {
+          const res = await fetch("/api/documents", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: user.id, fileName: fileRef.current.name, feature, content }),
+          });
+          const d = await res.json();
+          if (d.document) documentIdRef.current = d.document.id;
+        })();
+        await docPromiseRef.current;
+        docPromiseRef.current = null;
+        loadHistory();
+        return;
+      }
+      await docPromiseRef.current;
+      if (!documentIdRef.current) return;
+    }
+
     await fetch("/api/documents", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -242,6 +293,21 @@ export default function Dashboard() {
     if (!file || file.type !== "application/pdf") { setError("Per ora accettiamo solo file PDF."); return; }
     if (file.size > 10 * 1024 * 1024) { setError("Il file è troppo grande. Massimo 10MB."); return; }
 
+    // Il PDF viene solo caricato: l'utente sceglie poi quale aiuto usare
+    fileRef.current = file;
+    documentIdRef.current = null;
+    docPromiseRef.current = null;
+    setError("");
+    setFlashcards([]); setQuestions([]); setSlides([]); setMindmapMd("");
+    setExplanation(""); setExplainText("");
+    setCurrentCard(0); setKnown([]); setAnswers({}); setSubmitted(false);
+    setResult({ fileName: file.name, summary: "" });
+  };
+
+  /* ----- Riassunto (su richiesta) ----- */
+  const handleGenerateSummary = async () => {
+    if (!fileRef.current) return;
+
     const usage = await checkUsage("summary");
     if (!usage.allowed) {
       if (usage.reason === "limit_reached") setError(`Hai raggiunto il limite di ${usage.limit} riassunti/mese del piano Free. Passa a Pro per continuare!`);
@@ -249,40 +315,20 @@ export default function Dashboard() {
       return;
     }
 
-    fileRef.current = file;
-    documentIdRef.current = null;
-    setUploading(true); setError(""); setResult(null);
-    setFlashcards([]); setQuestions([]); setSlides([]); setMindmapMd("");
-    setCurrentCard(0); setKnown([]);
+    setLoadingSummary(true); setError("");
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", fileRef.current);
       const response = await fetch("/api/summarize", { method: "POST", body: formData });
       if (!response.ok) throw new Error("Errore nella generazione del riassunto.");
       const data = await response.json();
-      setResult({ fileName: file.name, summary: data.summary });
-
-      const docResponse = await fetch("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.id,
-          fileName: file.name,
-          feature: "summary",
-          content: { summary: data.summary },
-        }),
-      });
-      const docData = await docResponse.json();
-      if (docData.document) {
-        documentIdRef.current = docData.document.id;
-        setResult({ fileName: file.name, summary: data.summary, documentId: docData.document.id });
-        loadHistory();
-      }
+      setResult(prev => ({ ...prev, summary: data.summary }));
       setActiveTab("summary");
+      await saveResult("summary", { summary: data.summary });
     } catch (err) {
       setError(err.message || "Qualcosa è andato storto.");
     } finally {
-      setUploading(false);
+      setLoadingSummary(false);
     }
   };
 
@@ -544,6 +590,32 @@ export default function Dashboard() {
   const quizScore = submitted ? questions.filter((q, i) => answers[i] === q.corretta).length : 0;
   const isLastCard = known.length === flashcards.length && flashcards.length > 0;
   const knownCards = known.filter(k => k.known).length;
+
+  const renderIntro = (key) => {
+    const info = TAB_INFO[key];
+    return (
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: "1.4rem" }}>{info.icon}</span>
+          <span style={{ fontFamily: "var(--font-display)", fontSize: "1.1rem", fontWeight: 700 }}>{info.title}</span>
+          {info.badge && (
+            <span style={{ fontSize: "0.65rem", background: "rgba(200,241,53,0.1)", color: "var(--lime)", border: "1px solid rgba(200,241,53,0.3)", padding: "2px 10px", borderRadius: "100px" }}>⚡ {info.badge}</span>
+          )}
+        </div>
+        <p style={{ color: "var(--muted)", fontSize: "0.9rem", lineHeight: 1.6 }}>{info.text}</p>
+      </div>
+    );
+  };
+
+  const tabsRow = (
+    <div className="tabs">
+      {Object.keys(TAB_INFO).map((key) => (
+        <button key={key} className={`tab-btn ${activeTab === key ? "active" : ""}`} onClick={() => setActiveTab(key)}>
+          {TAB_INFO[key].icon} {TAB_INFO[key].title}
+        </button>
+      ))}
+    </div>
+  );
 
   const featureLabel = (f) =>
     f === "summary" ? "📝 Riassunto" :
@@ -814,7 +886,15 @@ export default function Dashboard() {
         {/* ---------- UPLOAD E RISULTATI ---------- */}
         {view === "upload" && (
           <div>
-            {!uploading && !result && (
+            {!result && (
+              <div style={{ marginBottom: 24 }}>
+                <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginBottom: 12 }}>Scopri cosa può fare BrainGifted per te 👇</p>
+                {tabsRow}
+                <div className="summary-box">{renderIntro(activeTab)}</div>
+              </div>
+            )}
+
+            {!result && (
               <div
                 className={`upload-zone ${dragOver ? "drag-over" : ""}`}
                 onClick={() => fileInputRef.current.click()}
@@ -835,18 +915,11 @@ export default function Dashboard() {
               </div>
             )}
 
-            {uploading && (
-              <div className="loading">
-                <div className="spinner"></div>
-                <p>Sto analizzando il documento e generando il riassunto...</p>
-              </div>
-            )}
-
             {result && (
               <div>
                 <div className="result-header">
                   <div>
-                    <div className="result-title">Documento analizzato ✨</div>
+                    <div className="result-title">Documento caricato ✨ Scegli cosa vuoi fare</div>
                     <div className="result-file">📄 {result.fileName}</div>
                   </div>
                   <button
@@ -854,25 +927,26 @@ export default function Dashboard() {
                     onClick={() => {
                       setResult(null); setFlashcards([]); setQuestions([]); setSlides([]);
                       setMindmapMd(""); setExplanation(""); setExplainText("");
-                      fileRef.current = null; documentIdRef.current = null;
+                      fileRef.current = null; documentIdRef.current = null; docPromiseRef.current = null;
                     }}
                   >
                     + Nuovo
                   </button>
                 </div>
 
-                <div className="tabs">
-                  <button className={`tab-btn ${activeTab === "summary" ? "active" : ""}`} onClick={() => setActiveTab("summary")}>📝 Riassunto</button>
-                  <button className={`tab-btn ${activeTab === "flashcards" ? "active" : ""}`} onClick={() => setActiveTab("flashcards")}>🃏 Flashcard</button>
-                  <button className={`tab-btn ${activeTab === "quiz" ? "active" : ""}`} onClick={() => setActiveTab("quiz")}>🧠 Quiz</button>
-                  <button className={`tab-btn ${activeTab === "explain" ? "active" : ""}`} onClick={() => setActiveTab("explain")}>💡 Spiegazioni</button>
-                  <button className={`tab-btn ${activeTab === "slides" ? "active" : ""}`} onClick={() => setActiveTab("slides")}>🎤 Discorso</button>
-                  <button className={`tab-btn ${activeTab === "mindmap" ? "active" : ""}`} onClick={() => setActiveTab("mindmap")}>🗺️ Mappa</button>
-                </div>
+                {tabsRow}
 
                 {/* RIASSUNTO */}
                 {activeTab === "summary" && (
                   <div>
+                    {loadingSummary && <div className="loading"><div className="spinner"></div><p>Generando il riassunto...</p></div>}
+                    {!loadingSummary && !result.summary && (
+                      <div className="summary-box" style={{ textAlign: "center" }}>
+                        {renderIntro("summary")}
+                        <button className="btn-generate" onClick={handleGenerateSummary}>📝 Genera riassunto</button>
+                      </div>
+                    )}
+                    {!loadingSummary && result.summary && (<>
                     <div className="summary-box">
                       <div className="summary-label">⚡ Riassunto AI</div>
                       <div className="summary-text">{result.summary}</div>
@@ -888,6 +962,7 @@ export default function Dashboard() {
                     <button className="btn-generate" onClick={handleGenerateQuiz} disabled={loadingQuiz}>
                       {loadingQuiz ? "⏳ Generando quiz..." : "🧠 Genera quiz"}
                     </button>
+                    </>)}
                   </div>
                 )}
 
@@ -897,7 +972,7 @@ export default function Dashboard() {
                     {loadingFlashcards && <div className="loading"><div className="spinner"></div><p>Generando le flashcard...</p></div>}
                     {!loadingFlashcards && flashcards.length === 0 && (
                       <div className="summary-box" style={{ textAlign: "center" }}>
-                        <p style={{ color: "var(--muted)", marginBottom: 16 }}>Nessuna flashcard generata.</p>
+                        {renderIntro("flashcards")}
                         <button className="btn-generate" onClick={handleGenerateFlashcards}>🃏 Genera flashcard</button>
                       </div>
                     )}
@@ -940,7 +1015,7 @@ export default function Dashboard() {
                     {loadingQuiz && <div className="loading"><div className="spinner"></div><p>Generando il quiz...</p></div>}
                     {!loadingQuiz && questions.length === 0 && (
                       <div className="summary-box" style={{ textAlign: "center" }}>
-                        <p style={{ color: "var(--muted)", marginBottom: 16 }}>Nessun quiz generato.</p>
+                        {renderIntro("quiz")}
                         <button className="btn-generate" onClick={handleGenerateQuiz}>🧠 Genera quiz</button>
                       </div>
                     )}
@@ -991,10 +1066,7 @@ export default function Dashboard() {
                 {activeTab === "explain" && (
                   <div>
                     <div className="summary-box" style={{ marginBottom: 16 }}>
-                      <div className="summary-label">💡 Spiegami semplice</div>
-                      <p style={{ color: "var(--muted)", fontSize: "0.9rem", marginBottom: 16 }}>
-                        Incolla un paragrafo difficile e BrainGifted lo spiegherà in modo semplice con esempi pratici.
-                      </p>
+                      {renderIntro("explain")}
                       <textarea
                         value={explainText}
                         onChange={(e) => setExplainText(e.target.value)}
@@ -1022,7 +1094,8 @@ export default function Dashboard() {
 
                     {!loadingSlides && slides.length === 0 && (
                       <div className="summary-box" style={{ textAlign: "center" }}>
-                        <p style={{ color: "var(--muted)", marginBottom: 8 }}>
+                        {renderIntro("slides")}
+                        <p style={{ color: "var(--muted)", marginBottom: 12, fontSize: "0.8rem" }}>
                           {plan === "pro" ? "10 slide con 5 punti chiave + export PowerPoint ⚡" : "7 slide con 3 punti chiave per il piano Free"}
                         </p>
                         <button className="btn-generate" onClick={handleGenerateSlides}>🎤 Genera struttura discorso</button>
@@ -1096,7 +1169,7 @@ export default function Dashboard() {
                   <div>
                     {plan === "pro" && !mindmapMd && !loadingMindmap && (
                       <div className="summary-box" style={{ textAlign: "center" }}>
-                        <p style={{ color: "var(--muted)", marginBottom: 8 }}>Trasforma il documento in una mappa mentale interattiva ⚡</p>
+                        {renderIntro("mindmap")}
                         <button className="btn-generate" onClick={handleGenerateMindmap}>🗺️ Genera mappa mentale</button>
                       </div>
                     )}
