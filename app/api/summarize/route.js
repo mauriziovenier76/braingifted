@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { extractText } from "unpdf";
+import { getUserFromRequest } from "../../../lib/auth-server";
 
 export const runtime = "nodejs";
 
 export async function POST(request) {
   try {
+    // 🔒 1. Chi sta chiamando? Se non è loggato, stop.
+    const auth = await getUserFromRequest(request);
+    if (!auth) {
+      return NextResponse.json({ error: "Devi effettuare l'accesso." }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
 
@@ -61,6 +68,6 @@ ${trimmedText}`,
 
   } catch (err) {
     console.error("Server error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Errore del server" }, { status: 500 });
   }
 }

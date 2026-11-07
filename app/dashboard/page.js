@@ -242,6 +242,12 @@ export default function Dashboard() {
     }
   };
 
+    // Restituisce l'header con il token di login, da mandare alle API
+  const authHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session ? { Authorization: `Bearer ${session.access_token}` } : {};
+  };
+
   const checkUsage = async (feature) => {
     const response = await fetch("/api/usage", {
       method: "POST",
