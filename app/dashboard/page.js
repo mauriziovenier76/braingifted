@@ -451,8 +451,7 @@ export default function Dashboard() {
     try {
       const formData = new FormData();
       formData.append("file", fileRef.current);
-      formData.append("plan", plan);
-      const response = await fetch("/api/slides", { method: "POST", body: formData });
+      const response = await fetch("/api/slides", { method: "POST", headers: await authHeaders(), body: formData });
       if (!response.ok) throw new Error("Errore nella generazione delle slide.");
       const data = await response.json();
       setSlides(data.slides);
