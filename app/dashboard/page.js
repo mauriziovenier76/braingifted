@@ -232,7 +232,7 @@ export default function Dashboard() {
   const loadHistory = async () => {
     setLoadingHistory(true);
     try {
-      const response = await fetch(`/api/documents?userId=${user.id}&plan=${plan}`);
+      const response = await fetch("/api/documents", { headers: await authHeaders() });
       const data = await response.json();
       setDocuments(data.documents || []);
     } catch (err) {
@@ -266,8 +266,8 @@ export default function Dashboard() {
         docPromiseRef.current = (async () => {
           const res = await fetch("/api/documents", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId: user.id, fileName: fileRef.current.name, feature, content }),
+            headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+            body: JSON.stringify({ fileName: fileRef.current.name, feature, content }),
           });
           const d = await res.json();
           if (d.document) documentIdRef.current = d.document.id;
@@ -283,10 +283,9 @@ export default function Dashboard() {
 
     await fetch("/api/documents", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify({
         documentId: documentIdRef.current,
-        userId: user.id,
         feature,
         content,
       }),

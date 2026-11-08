@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getUserFromRequest } from "../../../lib/auth-server";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const unauthorized = () =>
+  NextResponse.json({ error: "Devi effettuare l'accesso." }, { status: 401 });
 
 // Salva un nuovo documento e il suo risultato
 export async function POST(request) {
   try {
-    const { userId, fileName, feature, content } = await request.json();
+    const auth = await getUserFromRequest(request);
+    if (!auth) return unauthorized();
+    const supabase = auth.supabaseAdmin;
+    const userId = auth.user.id;
 
-    // Crea il documento
+    const { fileName, feature, content } = await request.json();
+
     const { data: doc, error: docError } = await supabase
       .from("documents")
       .insert({ user_id: userId, file_name: fileName })
@@ -20,7 +22,6 @@ export async function POST(request) {
 
     if (docError) throw docError;
 
-    // Salva il risultato
     await supabase.from("results").insert({
       document_id: doc.id,
       user_id: userId,
@@ -30,20 +31,19 @@ export async function POST(request) {
 
     return NextResponse.json({ document: doc });
   } catch (err) {
-    console.error("Error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Documents POST error:", err);
+    return NextResponse.json({ error: "Errore del server" }, { status: 500 });
   }
 }
 
 // Recupera lo storico dell'utente
 export async function GET(request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-    const plan = searchParams.get("plan") || "free";
-    const limit = plan === "pro" ? 1000 : 3;
+    const auth = await getUserFromRequest(request);
+    if (!auth) return unauthorized();
+    const limit = auth.plan === "pro" ? 1000 : 3;
 
-    const { data: documents } = await supabase
+    const { data: documents } = await auth.supabaseAdmin
       .from("documents")
       .select(`
         id,
@@ -56,38 +56,49 @@ export async function GET(request) {
           created_at
         )
       `)
-      .eq("user_id", userId)
+      .eq("user_id", auth.user.id)
       .order("created_at", { ascending: false })
       .limit(limit);
 
     return NextResponse.json({ documents: documents || [] });
   } catch (err) {
-    console.error("Error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Documents GET error:", err);
+    return NextResponse.json({ error: "Errore del server" }, { status: 500 });
   }
 }
 
 // Aggiungi un risultato a un documento esistente
 export async function PUT(request) {
   try {
-    const { documentId, userId, feature, content } = await request.json();
+    const auth = await getUserFromRequest(request);
+    if (!auth) return unauthorized();
+    const supabase = auth.supabaseAdmin;
+    const userId = auth.user.id;
 
-    // Controlla se esiste già un risultato per questa feature
+    const { documentId, feature, content } = await request.json();
+
+    // 🔒 Il documento deve appartenere a chi sta chiamando
+    const { data: doc } = await supabase
+      .from("documents")
+      .select("id")
+      .eq("id", documentId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!doc) {
+      return NextResponse.json({ error: "Documento non trovato." }, { status: 404 });
+    }
+
     const { data: existing } = await supabase
       .from("results")
       .select("id")
       .eq("document_id", documentId)
       .eq("feature", feature)
-      .single();
+      .maybeSingle();
 
     if (existing) {
-      // Aggiorna
-      await supabase
-        .from("results")
-        .update({ content })
-        .eq("id", existing.id);
+      await supabase.from("results").update({ content }).eq("id", existing.id);
     } else {
-      // Inserisci
       await supabase.from("results").insert({
         document_id: documentId,
         user_id: userId,
@@ -98,7 +109,7 @@ export async function PUT(request) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Documents PUT error:", err);
+    return NextResponse.json({ error: "Errore del server" }, { status: 500 });
   }
 }
