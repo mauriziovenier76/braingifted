@@ -310,23 +310,16 @@ export default function Dashboard() {
   };
 
   /* ----- Riassunto (su richiesta) ----- */
-  const handleGenerateSummary = async () => {
+    const handleGenerateSummary = async () => {
     if (!fileRef.current) return;
-
-    const usage = await checkUsage("summary");
-    if (!usage.allowed) {
-      if (usage.reason === "limit_reached") setError(`Hai raggiunto il limite di ${usage.limit} riassunti/mese del piano Free. Passa a Pro per continuare!`);
-      if (usage.reason === "pro_only") setError("Questa funzione è disponibile solo per il piano Pro.");
-      return;
-    }
 
     setLoadingSummary(true); setError("");
     try {
       const formData = new FormData();
       formData.append("file", fileRef.current);
       const response = await fetch("/api/summarize", { method: "POST", headers: await authHeaders(), body: formData });
-      if (!response.ok) throw new Error("Errore nella generazione del riassunto.");
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Errore nella generazione del riassunto.");
       setResult(prev => ({ ...prev, summary: data.summary }));
       setActiveTab("summary");
       await saveResult("summary", { summary: data.summary });

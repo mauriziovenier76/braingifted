@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { extractText } from "unpdf";
 import { getUserFromRequest } from "../../../lib/auth-server";
+import { canUse, recordUsage } from "../../../lib/usage-server";
 
 export const runtime = "nodejs";
 
@@ -10,6 +11,12 @@ export async function POST(request) {
     const auth = await getUserFromRequest(request);
     if (!auth) {
       return NextResponse.json({ error: "Devi effettuare l'accesso." }, { status: 401 });
+    }
+
+    // 🔒 2. Può ancora usare questa funzione questo mese?
+    const check = await canUse(auth, "summary");
+    if (!check.allowed) {
+      return NextResponse.json({ error: check.error, reason: check.reason }, { status: 403 });
     }
 
     const formData = await request.formData();
@@ -64,6 +71,10 @@ ${trimmedText}`,
 
     const data = await response.json();
     const summary = data.content[0].text;
+
+    // ✅ 3. Tutto ok: registra l'utilizzo
+    await recordUsage(auth, "summary");
+
     return NextResponse.json({ summary });
 
   } catch (err) {
