@@ -1,16 +1,24 @@
 import { NextResponse } from "next/server";
 import { extractText } from "unpdf";
 import { getUserFromRequest } from "../../../lib/auth-server";
+import { canUse, recordUsage } from "../../../lib/usage-server";
 
 export const runtime = "nodejs";
 
 export async function POST(request) {
   try {
-        // 🔒 Chi sta chiamando? Se non è loggato, stop.
+    // 🔒 Chi sta chiamando? Se non è loggato, stop.
     const auth = await getUserFromRequest(request);
     if (!auth) {
       return NextResponse.json({ error: "Devi effettuare l'accesso." }, { status: 401 });
     }
+
+    // 🔒 Può ancora usare questa funzione questo mese?
+    const check = await canUse(auth, "slides");
+    if (!check.allowed) {
+      return NextResponse.json({ error: check.error, reason: check.reason }, { status: 403 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
     const plan = auth.plan; // il piano lo legge il server, non il browser
@@ -76,10 +84,12 @@ ${trimmedText}`,
     const start = raw.indexOf("[");
     const end = raw.lastIndexOf("]");
     const slides = JSON.parse(raw.slice(start, end + 1));
+    // ✅ Tutto ok: registra l'utilizzo
+    await recordUsage(auth, "slides");
     return NextResponse.json({ slides });
 
   } catch (err) {
     console.error("Server error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Errore nella generazione. Riprova." }, { status: 500 });
   }
 }

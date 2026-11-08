@@ -242,7 +242,7 @@ export default function Dashboard() {
     }
   };
 
-    // Restituisce l'header con il token di login, da mandare alle API
+  // Restituisce l'header con il token di login, da mandare alle API
   const authHeaders = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     return session ? { Authorization: `Bearer ${session.access_token}` } : {};
@@ -310,7 +310,7 @@ export default function Dashboard() {
   };
 
   /* ----- Riassunto (su richiesta) ----- */
-    const handleGenerateSummary = async () => {
+  const handleGenerateSummary = async () => {
     if (!fileRef.current) return;
 
     setLoadingSummary(true); setError("");
@@ -334,20 +334,14 @@ export default function Dashboard() {
   const handleGenerateFlashcards = async () => {
     if (!fileRef.current) return;
 
-    const usage = await checkUsage("flashcards");
-    if (!usage.allowed) {
-      if (usage.reason === "limit_reached") setError(`Hai raggiunto il limite di ${usage.limit} flashcard/mese del piano Free. Passa a Pro!`);
-      if (usage.reason === "pro_only") setError("Questa funzione è disponibile solo per il piano Pro.");
-      return;
-    }
 
     setLoadingFlashcards(true); setFlipped(false); setCurrentCard(0); setKnown([]);
     try {
       const formData = new FormData();
       formData.append("file", fileRef.current);
-            const response = await fetch("/api/flashcards", { method: "POST", headers: await authHeaders(), body: formData });
-      if (!response.ok) throw new Error("Errore nella generazione delle flashcard.");
+      const response = await fetch("/api/flashcards", { method: "POST", headers: await authHeaders(), body: formData });
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Errore nella generazione delle flashcard.");
       setFlashcards(data.flashcards);
       setActiveTab("flashcards");
       await saveResult("flashcards", { flashcards: data.flashcards });
@@ -368,20 +362,14 @@ export default function Dashboard() {
   const handleGenerateQuiz = async () => {
     if (!fileRef.current) return;
 
-    const usage = await checkUsage("quiz");
-    if (!usage.allowed) {
-      if (usage.reason === "limit_reached") setError(`Hai raggiunto il limite di ${usage.limit} quiz/mese del piano Free. Passa a Pro!`);
-      if (usage.reason === "pro_only") setError("Questa funzione è disponibile solo per il piano Pro.");
-      return;
-    }
 
     setLoadingQuiz(true); setAnswers({}); setSubmitted(false);
     try {
       const formData = new FormData();
       formData.append("file", fileRef.current);
-            const response = await fetch("/api/quiz", { method: "POST", headers: await authHeaders(), body: formData });
-      if (!response.ok) throw new Error("Errore nella generazione del quiz.");
+      const response = await fetch("/api/quiz", { method: "POST", headers: await authHeaders(), body: formData });
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Errore nella generazione del quiz.");
       setQuestions(data.questions);
       setActiveTab("quiz");
       await saveResult("quiz", { questions: data.questions });
@@ -432,20 +420,14 @@ export default function Dashboard() {
   const handleGenerateSlides = async () => {
     if (!fileRef.current) return;
 
-    const usage = await checkUsage("slides");
-    if (!usage.allowed) {
-      if (usage.reason === "limit_reached") setError(`Hai raggiunto il limite di ${usage.limit} presentazioni/mese del piano Free. Passa a Pro!`);
-      if (usage.reason === "pro_only") setError("Questa funzione è disponibile solo per il piano Pro.");
-      return;
-    }
 
     setLoadingSlides(true); setSlides([]);
     try {
       const formData = new FormData();
       formData.append("file", fileRef.current);
       const response = await fetch("/api/slides", { method: "POST", headers: await authHeaders(), body: formData });
-      if (!response.ok) throw new Error("Errore nella generazione delle slide.");
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Errore nella generazione delle slide.");
       setSlides(data.slides);
       setActiveTab("slides");
       await saveResult("slides", { slides: data.slides });
