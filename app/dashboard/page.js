@@ -423,7 +423,7 @@ export default function Dashboard() {
     try {
       const response = await fetch("/api/explain", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeaders()) },
         body: JSON.stringify({ text: explainText }),
       });
       if (!response.ok) throw new Error("Errore nella spiegazione.");
@@ -470,7 +470,7 @@ export default function Dashboard() {
     try {
       const response = await fetch("/api/export-pptx", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeaders()) },
         body: JSON.stringify({ slides, title: result?.fileName }),
       });
       if (!response.ok) throw new Error("Errore nell'export.");

@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import PptxGenJS from "pptxgenjs";
+import { getUserFromRequest } from "../../../lib/auth-server";
 
 export const runtime = "nodejs";
 
 export async function POST(request) {
   try {
+        // 🔒 Solo utenti loggati con piano Pro
+    const auth = await getUserFromRequest(request);
+    if (!auth) {
+      return NextResponse.json({ error: "Devi effettuare l'accesso." }, { status: 401 });
+    }
+    if (auth.plan !== "pro") {
+      return NextResponse.json({ error: "Funzione riservata al piano Pro." }, { status: 403 });
+    }
     const { slides, title } = await request.json();
 
     const pres = new PptxGenJS();
