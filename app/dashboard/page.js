@@ -251,8 +251,8 @@ export default function Dashboard() {
   const checkUsage = async (feature) => {
     const response = await fetch("/api/usage", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, feature }),
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      body: JSON.stringify({ feature }),
     });
     return await response.json();
   };

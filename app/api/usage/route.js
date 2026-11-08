@@ -1,24 +1,25 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { LIMITS } from "../../../lib/limits";
+import { getUserFromRequest } from "../../../lib/auth-server";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+function startOfMonthISO() {
+  const d = new Date();
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
 
 export async function POST(request) {
   try {
-    const { userId, feature } = await request.json();
+    // 🔒 L'utente e il piano li legge il server dal token
+    const auth = await getUserFromRequest(request);
+    if (!auth) {
+      return NextResponse.json({ error: "Devi effettuare l'accesso." }, { status: 401 });
+    }
+    const { user, plan, supabaseAdmin: supabase } = auth;
+    const userId = user.id;
 
-    // Leggi il piano dell'utente
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("plan")
-      .eq("id", userId)
-      .single();
-
-    const plan = profile?.plan || "free";
+    const { feature } = await request.json();
 
     // Se Pro, registra e lascia passare
     if (plan === "pro") {
@@ -27,16 +28,12 @@ export async function POST(request) {
     }
 
     // Conta utilizzi questo mese
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
     const { count } = await supabase
       .from("usage")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("feature", feature)
-      .gte("created_at", startOfMonth.toISOString());
+      .gte("created_at", startOfMonthISO());
 
     const limit = LIMITS.free[feature] ?? 0;
 
@@ -54,24 +51,22 @@ export async function POST(request) {
 
   } catch (err) {
     console.error("Usage error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Errore del server" }, { status: 500 });
   }
 }
 
 export async function GET(request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
+    const auth = await getUserFromRequest(request);
+    if (!auth) {
+      return NextResponse.json({ error: "Devi effettuare l'accesso." }, { status: 401 });
+    }
 
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const { data } = await supabase
+    const { data } = await auth.supabaseAdmin
       .from("usage")
       .select("feature")
-      .eq("user_id", userId)
-      .gte("created_at", startOfMonth.toISOString());
+      .eq("user_id", auth.user.id)
+      .gte("created_at", startOfMonthISO());
 
     const counts = {};
     (data || []).forEach(row => {
@@ -80,6 +75,7 @@ export async function GET(request) {
 
     return NextResponse.json({ counts });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Usage GET error:", err);
+    return NextResponse.json({ error: "Errore del server" }, { status: 500 });
   }
 }
