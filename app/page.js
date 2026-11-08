@@ -99,8 +99,8 @@ export default function Home() {
         /* FEATURES */
         .features-section { padding: 100px 24px; }
         .features-inner { max-width: 1100px; margin: 0 auto; }
-        .features-tabs { display: flex; gap: 8px; margin-top: 48px; border-bottom: 1px solid var(--border); padding-bottom: 0; }
-        .tab-btn { background: none; border: none; padding: 12px 24px; font-family: var(--font-body); font-size: 0.9rem; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; }
+        .features-tabs { display: flex; gap: 8px; margin-top: 48px; border-bottom: 1px solid var(--border); padding-bottom: 0; overflow-x: auto; }
+        .tab-btn { white-space: nowrap; background: none; border: none; padding: 12px 24px; font-family: var(--font-body); font-size: 0.9rem; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; }
         .tab-btn.active { color: var(--lime); border-bottom-color: var(--lime); }
         .tab-btn:hover:not(.active) { color: var(--text); }
         .tab-content { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; margin-top: 56px; }
@@ -195,17 +195,17 @@ export default function Home() {
       <div className="hero">
         <div className="hero-badge">
           <span className="badge-dot"></span>
-          Powered by AI · Studia 3x più veloce
+          Powered by AI · 6 strumenti di studio
         </div>
         <h1>Studia <em>meglio</em>,<br />impara di più.</h1>
-        <p>Carica i tuoi appunti, PDF o presentazioni. BrainGifted li trasforma in riassunti, flashcard e quiz in secondi.</p>
+        <p>Carica il PDF dei tuoi appunti o del libro. BrainGifted lo trasforma in riassunti, flashcard, quiz, mappe mentali e discorsi in pochi secondi.</p>
         <div className="hero-cta">
           <a href="/signup" className="btn-primary">Inizia gratis →</a>
           <a href="#features" className="btn-ghost">Scopri come funziona</a>
         </div>
         <div className="hero-stats">
-          <div className="stat"><div className="stat-num">3x</div><div className="stat-label">più veloce</div></div>
-          <div className="stat"><div className="stat-num">5</div><div className="stat-label">doc gratuiti/mese</div></div>
+          <div className="stat"><div className="stat-num">6</div><div className="stat-label">strumenti di studio</div></div>
+          <div className="stat"><div className="stat-num">€0</div><div className="stat-label">per iniziare</div></div>
           <div className="stat"><div className="stat-num">100%</div><div className="stat-label">automatico</div></div>
         </div>
       </div>
@@ -223,6 +223,7 @@ export default function Home() {
               { id: "quiz", label: "🧠 Quiz" },
               { id: "explain", label: "💡 Spiegazioni" },
               { id: "slides", label: "🎤 Discorso" },
+              { id: "mindmap", label: "🗺️ Mappa" },
             ].map((t) => (
               <button key={t.id} className={`tab-btn ${activeTab === t.id ? "active" : ""}`} onClick={() => setActiveTab(t.id)}>
                 {t.label}
@@ -235,11 +236,11 @@ export default function Home() {
               <>
                 <div className="tab-text">
                   <h3>Riassunti automatici istantanei</h3>
-                  <p>Carica qualsiasi documento — PDF, Word, PowerPoint — e ottieni un riassunto breve, dettagliato o per punti chiave in pochi secondi.</p>
+                  <p>Carica il tuo PDF e ottieni in pochi secondi un riassunto chiaro, con i concetti principali messi in evidenza.</p>
                   <div className="tab-perks">
-                    <div className="perk"><div className="perk-icon">✦</div>Riassunto breve in 3 punti</div>
-                    <div className="perk"><div className="perk-icon">✦</div>Analisi dettagliata completa</div>
-                    <div className="perk"><div className="perk-icon">✦</div>Punti chiave evidenziati</div>
+                    <div className="perk"><div className="perk-icon">✦</div>Punti chiave in evidenza</div>
+                    <div className="perk"><div className="perk-icon">✦</div>Riassunto chiaro e ordinato</div>
+                    <div className="perk"><div className="perk-icon">✦</div>Export in Word (Pro)</div>
                   </div>
                 </div>
                 <div className="tab-visual">
@@ -268,8 +269,8 @@ export default function Home() {
                   <p>BrainGifted estrae automaticamente i concetti chiave e crea flashcard domanda/risposta pronte per la revisione rapida.</p>
                   <div className="tab-perks">
                     <div className="perk"><div className="perk-icon">✦</div>Domande e risposte automatiche</div>
-                    <div className="perk"><div className="perk-icon">✦</div>Sistema so/non so per la ripetizione</div>
-                    <div className="perk"><div className="perk-icon">✦</div>Export compatibile con Anki (Pro)</div>
+                    <div className="perk"><div className="perk-icon">✦</div>Sistema sapevo/non sapevo per il ripasso</div>
+                    <div className="perk"><div className="perk-icon">✦</div>Punteggio a fine sessione</div>
                   </div>
                 </div>
                 <div className="tab-visual">
@@ -290,11 +291,11 @@ export default function Home() {
               <>
                 <div className="tab-text">
                   <h3>Quiz per testare la preparazione</h3>
-                  <p>Metti alla prova le tue conoscenze con quiz a scelta multipla, vero/falso e domande aperte generati dal tuo stesso materiale di studio.</p>
+                  <p>Metti alla prova le tue conoscenze con quiz a scelta multipla generati dal tuo stesso materiale di studio.</p>
                   <div className="tab-perks">
-                    <div className="perk"><div className="perk-icon">✦</div>Scelta multipla, V/F, aperte</div>
-                    <div className="perk"><div className="perk-icon">✦</div>Feedback immediato sulle risposte</div>
-                    <div className="perk"><div className="perk-icon">✦</div>Punteggio e statistiche (Pro)</div>
+                    <div className="perk"><div className="perk-icon">✦</div>10 domande a scelta multipla</div>
+                    <div className="perk"><div className="perk-icon">✦</div>Risposte corrette evidenziate</div>
+                    <div className="perk"><div className="perk-icon">✦</div>Punteggio immediato</div>
                   </div>
                 </div>
                 <div className="tab-visual">
@@ -315,8 +316,8 @@ export default function Home() {
             {activeTab === "explain" && (
               <>
                 <div className="tab-text">
-                  <h3>Spiegami come se avessi 10 anni</h3>
-                  <p>Seleziona qualsiasi paragrafo difficile e chiedi a BrainGifted di spiegartelo in modo semplice, con esempi pratici e analogie.</p>
+                  <h3>Spiegamelo semplice</h3>
+                  <p>Incolla qualsiasi paragrafo difficile e chiedi a BrainGifted di spiegartelo in modo semplice, con esempi pratici e analogie.</p>
                   <div className="tab-perks">
                     <div className="perk"><div className="perk-icon">✦</div>Spiegazione semplificata on-demand</div>
                     <div className="perk"><div className="perk-icon">✦</div>Esempi pratici e analogie</div>
@@ -325,7 +326,7 @@ export default function Home() {
                 </div>
                 <div className="tab-visual">
                   <div style={{background: "var(--surface2)", borderRadius: 12, padding: 20}}>
-                    <div style={{fontSize: "0.75rem", color: "var(--muted)", marginBottom: 12}}>Testo selezionato:</div>
+                    <div style={{fontSize: "0.75rem", color: "var(--muted)", marginBottom: 12}}>Testo incollato:</div>
                     <div style={{fontSize: "0.85rem", color: "#555", marginBottom: 16, fontStyle: "italic"}}>"L'obbligazione solidale passiva è quella in cui più debitori sono tenuti all'adempimento della stessa prestazione..."</div>
                     <div style={{borderTop: "1px solid var(--border)", paddingTop: 16}}>
                       <div style={{fontSize: "0.75rem", color: "var(--lime)", marginBottom: 8}}>⚡ BrainGifted spiega:</div>
@@ -343,7 +344,7 @@ export default function Home() {
                   <p>BrainGifted analizza il documento e genera una struttura completa per una presentazione orale, con slide di apertura, contenuto e chiusura.</p>
                   <div className="tab-perks">
                     <div className="perk"><div className="perk-icon">✦</div>Slide di apertura con hook</div>
-                    <div className="perk"><div className="perk-icon">✦</div>5-7 slide (Free) · 10 slide (Pro)</div>
+                    <div className="perk"><div className="perk-icon">✦</div>7 slide (Free) · 10 slide (Pro)</div>
                     <div className="perk"><div className="perk-icon">✦</div>Export PowerPoint (Pro)</div>
                   </div>
                 </div>
@@ -364,6 +365,41 @@ export default function Home() {
                 </div>
               </>
             )}
+
+            {activeTab === "mindmap" && (
+              <>
+                <div className="tab-text">
+                  <h3>Mappe mentali dei concetti</h3>
+                  <p>BrainGifted organizza i concetti del documento in una mappa mentale interattiva, per vedere a colpo d'occhio come sono collegati tra loro.</p>
+                  <div className="tab-perks">
+                    <div className="perk"><div className="perk-icon">✦</div>Concetto centrale e rami principali</div>
+                    <div className="perk"><div className="perk-icon">✦</div>Mappa interattiva da esplorare</div>
+                    <div className="perk"><div className="perk-icon">✦</div>Export PNG e SVG · Funzione Pro</div>
+                  </div>
+                </div>
+                <div className="tab-visual">
+                  <div style={{display: "flex", alignItems: "center", gap: 24, justifyContent: "center", minHeight: 216}}>
+                    <div style={{background: "rgba(200,241,53,0.1)", border: "1px solid rgba(200,241,53,0.4)", color: "var(--lime)", borderRadius: 10, padding: "10px 16px", fontWeight: 600, fontSize: "0.9rem", whiteSpace: "nowrap"}}>Fotosintesi</div>
+                    <div style={{display: "flex", flexDirection: "column", gap: 10, borderLeft: "2px solid rgba(200,241,53,0.5)", paddingLeft: 16}}>
+                      {[
+                        {t: "Fase luminosa", s: ["Tilacoidi", "ATP e NADPH"]},
+                        {t: "Fase oscura", s: ["Ciclo di Calvin", "Fissa la CO2"]},
+                        {t: "Fattori", s: ["Luce", "Acqua", "CO2"]},
+                      ].map((b, i) => (
+                        <div key={i}>
+                          <div style={{fontSize: "0.85rem", fontWeight: 600, marginBottom: 4}}>{b.t}</div>
+                          <div style={{display: "flex", gap: 6, flexWrap: "wrap"}}>
+                            {b.s.map((x, j) => (
+                              <span key={j} style={{fontSize: "0.72rem", color: "var(--muted)", background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 100, padding: "2px 10px"}}>{x}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -378,15 +414,14 @@ export default function Home() {
             <div className="pricing-price">€0<span>/mese</span></div>
             <div className="pricing-desc">Perfetto per provare BrainGifted e capire se fa per te.</div>
             <div className="pricing-features">
-              <div className="pricing-feature"><span className="check">✓</span> 3 documenti al mese</div>
-              <div className="pricing-feature"><span className="check">✓</span> Riassunto breve</div>
-              <div className="pricing-feature"><span className="check">✓</span> 10 flashcard per documento</div>
-              <div className="pricing-feature"><span className="check">✓</span> Quiz a scelta multipla (10 domande)</div>
-              <div className="pricing-feature"><span className="check">✓</span> 5-7 slide per il discorso</div>
-              <div className="pricing-feature disabled"><span className="cross">✗</span> Riassunto dettagliato</div>
-              <div className="pricing-feature disabled"><span className="cross">✗</span> Flashcard illimitate</div>
+              <div className="pricing-feature"><span className="check">✓</span> 3 riassunti al mese</div>
+              <div className="pricing-feature"><span className="check">✓</span> 3 set di flashcard al mese (10 carte)</div>
+              <div className="pricing-feature"><span className="check">✓</span> 3 quiz al mese (10 domande)</div>
+              <div className="pricing-feature"><span className="check">✓</span> 3 discorsi al mese (7 slide)</div>
+              <div className="pricing-feature"><span className="check">✓</span> Storico degli ultimi 3 documenti</div>
+              <div className="pricing-feature disabled"><span className="cross">✗</span> Mappe mentali</div>
               <div className="pricing-feature disabled"><span className="cross">✗</span> Spiegazione semplificata</div>
-              <div className="pricing-feature disabled"><span className="cross">✗</span> Export PowerPoint</div>
+              <div className="pricing-feature disabled"><span className="cross">✗</span> Export Word e PowerPoint</div>
             </div>
             <a href="/signup" className="btn-pricing outline">Inizia gratis</a>
           </div>
@@ -396,17 +431,15 @@ export default function Home() {
             <div className="pricing-price"><sup>€</sup>7<span>/mese</span></div>
             <div className="pricing-desc">Per chi studia seriamente e vuole il massimo dalle proprie sessioni.</div>
             <div className="pricing-features">
-              <div className="pricing-feature"><span className="check">✓</span> Documenti illimitati</div>
-              <div className="pricing-feature"><span className="check">✓</span> Riassunto breve + dettagliato + punti chiave</div>
-              <div className="pricing-feature"><span className="check">✓</span> Flashcard illimitate + export Anki</div>
-              <div className="pricing-feature"><span className="check">✓</span> Quiz avanzati (tutti i tipi)</div>
-              <div className="pricing-feature"><span className="check">✓</span> 10 slide con 5 punti chiave</div>
-              <div className="pricing-feature"><span className="check">✓</span> Export PowerPoint</div>
+              <div className="pricing-feature"><span className="check">✓</span> Riassunti, flashcard e quiz illimitati</div>
+              <div className="pricing-feature"><span className="check">✓</span> Discorsi da 10 slide con 5 punti chiave</div>
+              <div className="pricing-feature"><span className="check">✓</span> Mappe mentali + export PNG e SVG</div>
               <div className="pricing-feature"><span className="check">✓</span> Spiegazione semplificata</div>
-              <div className="pricing-feature"><span className="check">✓</span> Cronologia completa</div>
-              <div className="pricing-feature"><span className="check">✓</span> 7 giorni di prova gratuita</div>
+              <div className="pricing-feature"><span className="check">✓</span> Export Word del riassunto</div>
+              <div className="pricing-feature"><span className="check">✓</span> Export PowerPoint del discorso</div>
+              <div className="pricing-feature"><span className="check">✓</span> Storico completo dei documenti</div>
             </div>
-            <a href="/signup" className="btn-pricing solid">Prova 7 giorni gratis →</a>
+            <a href="/signup" className="btn-pricing solid">Inizia e passa a Pro →</a>
           </div>
         </div>
       </section>
@@ -415,7 +448,7 @@ export default function Home() {
       <div className="cta-section">
         <div className="cta-inner">
           <h2>Pronto a studiare in modo più intelligente?</h2>
-          <p>Unisciti a migliaia di studenti che usano BrainGifted per prepararsi meglio, in meno tempo.</p>
+          <p>Carica il tuo primo PDF e scopri come prepararti meglio, in meno tempo.</p>
           <a href="/signup" className="btn-primary">Inizia gratis — nessuna carta richiesta</a>
         </div>
       </div>
