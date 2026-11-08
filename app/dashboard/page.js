@@ -325,7 +325,7 @@ export default function Dashboard() {
     try {
       const formData = new FormData();
       formData.append("file", fileRef.current);
-            const response = await fetch("/api/summarize", { method: "POST", headers: await authHeaders(), body: formData });
+      const response = await fetch("/api/summarize", { method: "POST", headers: await authHeaders(), body: formData });
       if (!response.ok) throw new Error("Errore nella generazione del riassunto.");
       const data = await response.json();
       setResult(prev => ({ ...prev, summary: data.summary }));
@@ -353,7 +353,7 @@ export default function Dashboard() {
     try {
       const formData = new FormData();
       formData.append("file", fileRef.current);
-      const response = await fetch("/api/flashcards", { method: "POST", body: formData });
+            const response = await fetch("/api/flashcards", { method: "POST", headers: await authHeaders(), body: formData });
       if (!response.ok) throw new Error("Errore nella generazione delle flashcard.");
       const data = await response.json();
       setFlashcards(data.flashcards);
@@ -387,7 +387,7 @@ export default function Dashboard() {
     try {
       const formData = new FormData();
       formData.append("file", fileRef.current);
-      const response = await fetch("/api/quiz", { method: "POST", body: formData });
+            const response = await fetch("/api/quiz", { method: "POST", headers: await authHeaders(), body: formData });
       if (!response.ok) throw new Error("Errore nella generazione del quiz.");
       const data = await response.json();
       setQuestions(data.questions);
