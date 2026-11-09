@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { extractText } from "unpdf";
 import { getUserFromRequest } from "../../../lib/auth-server";
 import { canUse, recordUsage } from "../../../lib/usage-server";
+import { getStudyText } from "../../../lib/get-text";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(request) {
   try {
@@ -19,19 +20,11 @@ export async function POST(request) {
       return NextResponse.json({ error: check.error, reason: check.reason }, { status: 403 });
     }
 
+    // Testo dal PDF o dalle foto, con il limite del piano
     const formData = await request.formData();
-    const file = formData.get("file");
-
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = new Uint8Array(arrayBuffer);
-    const { text } = await extractText(buffer, { mergePages: true });
-    const trimmedText = text?.slice(0, 8000) || "";
-
-    console.log("Testo estratto (primi 200 char):", trimmedText.slice(0, 200));
-    console.log("Lunghezza testo:", trimmedText.length);
-
-    if (!trimmedText || trimmedText.trim().length < 50) {
-      return NextResponse.json({ error: "Impossibile estrarre testo dal PDF" }, { status: 400 });
+    const doc = await getStudyText(formData, auth.plan);
+    if (doc.error) {
+      return NextResponse.json({ error: doc.error }, { status: 400 });
     }
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -48,28 +41,36 @@ export async function POST(request) {
           {
             role: "user",
             content: `Sei un assistente di studio. Dal testo seguente crea 10 flashcard domanda/risposta in italiano.
+Distribuisci le domande su TUTTO il testo, dall'inizio alla fine, non solo sulla prima parte.
 
 Rispondi SOLO con un array JSON, senza markdown, senza backtick, senza spiegazioni. Solo JSON puro:
 [{"domanda":"...","risposta":"..."},{"domanda":"...","risposta":"..."}]
 
 Testo:
-${trimmedText}`,
+${doc.text}`,
           },
         ],
       }),
     });
 
+    if (!response.ok) {
+      const errData = await response.json();
+      console.error("Anthropic error:", errData);
+      return NextResponse.json({ error: "Errore API AI" }, { status: 500 });
+    }
+
     const data = await response.json();
-    let raw = data.content[0].text;
+    const raw = data.content[0].text;
 
     // Estrai direttamente tutto ciò che sta tra [ e ]
     const start = raw.indexOf("[");
     const end = raw.lastIndexOf("]");
     if (start === -1 || end === -1) throw new Error("JSON non trovato");
     const flashcards = JSON.parse(raw.slice(start, end + 1));
+
     // ✅ Tutto ok: registra l'utilizzo
     await recordUsage(auth, "flashcards");
-    return NextResponse.json({ flashcards });
+    return NextResponse.json({ flashcards, truncated: doc.truncated, maxPages: doc.maxPages });
 
   } catch (err) {
     console.error("Server error:", err);

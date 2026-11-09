@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { extractText } from "unpdf";
 import { getUserFromRequest } from "../../../lib/auth-server";
 import { canUse, recordUsage } from "../../../lib/usage-server";
+import { getStudyText } from "../../../lib/get-text";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(request) {
   try {
@@ -19,14 +20,14 @@ export async function POST(request) {
       return NextResponse.json({ error: check.error, reason: check.reason }, { status: 403 });
     }
 
-    const formData = await request.formData();
-    const file = formData.get("file");
     const plan = auth.plan; // il piano lo legge il server, non il browser
 
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = new Uint8Array(arrayBuffer);
-    const { text } = await extractText(buffer, { mergePages: true });
-    const trimmedText = text?.slice(0, 8000) || "";
+    // Testo dal PDF o dalle foto, con il limite del piano
+    const formData = await request.formData();
+    const doc = await getStudyText(formData, plan);
+    if (doc.error) {
+      return NextResponse.json({ error: doc.error }, { status: 400 });
+    }
 
     const slideCount = plan === "pro" ? 10 : 7;
     const pointCount = plan === "pro" ? 5 : 3;
@@ -45,6 +46,7 @@ export async function POST(request) {
           {
             role: "user",
             content: `Sei un esperto di comunicazione e presentazioni. Dal testo seguente crea una struttura per una presentazione orale in italiano.
+Copri TUTTI gli argomenti del testo, dall'inizio alla fine, non solo i primi.
 
 La struttura deve avere:
 - 1 slide di apertura (titolo + sottotitolo + 1 frase di hook)
@@ -73,20 +75,28 @@ Rispondi SOLO con un array JSON puro, senza markdown, senza backtick:
 ]
 
 Testo:
-${trimmedText}`,
+${doc.text}`,
           },
         ],
       }),
     });
 
+    if (!response.ok) {
+      const errData = await response.json();
+      console.error("Anthropic error:", errData);
+      return NextResponse.json({ error: "Errore API AI" }, { status: 500 });
+    }
+
     const data = await response.json();
-    let raw = data.content[0].text;
+    const raw = data.content[0].text;
     const start = raw.indexOf("[");
     const end = raw.lastIndexOf("]");
+    if (start === -1 || end === -1) throw new Error("JSON non trovato");
     const slides = JSON.parse(raw.slice(start, end + 1));
+
     // ✅ Tutto ok: registra l'utilizzo
     await recordUsage(auth, "slides");
-    return NextResponse.json({ slides });
+    return NextResponse.json({ slides, truncated: doc.truncated, maxPages: doc.maxPages });
 
   } catch (err) {
     console.error("Server error:", err);

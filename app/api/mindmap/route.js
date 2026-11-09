@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
-import { extractText } from "unpdf";
+import { getStudyText } from "../../../lib/get-text";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -40,18 +41,11 @@ export async function POST(request) {
       return NextResponse.json({ error: "Funzione riservata al piano Pro" }, { status: 403 });
     }
 
-    // 3. Leggi il PDF
+    // 3. Testo dal PDF o dalle foto, con il limite del piano Pro
     const formData = await request.formData();
-    const file = formData.get("file");
-    if (!file) {
-      return NextResponse.json({ error: "Nessun file ricevuto" }, { status: 400 });
-    }
-
-    const buffer = new Uint8Array(await file.arrayBuffer());
-    const { text } = await extractText(buffer, { mergePages: true });
-    const trimmedText = text?.slice(0, 8000) || "";
-    if (trimmedText.trim().length < 50) {
-      return NextResponse.json({ error: "Impossibile estrarre testo dal PDF" }, { status: 400 });
+    const doc = await getStudyText(formData, "pro");
+    if (doc.error) {
+      return NextResponse.json({ error: doc.error }, { status: 400 });
     }
 
     // 4. Chiedi la mappa all'AI
@@ -77,6 +71,7 @@ Regole:
 - Per ogni ramo da 2 a 4 sotto-concetti con "- ".
 - Ogni etichetta deve essere BREVE: massimo 6 parole, niente frasi complete, niente punto finale.
 - Usa solo i contenuti del testo, non inventare.
+- Copri TUTTO il testo, dall'inizio alla fine, non solo la prima parte.
 
 Esempio di formato:
 # Fotosintesi
@@ -88,7 +83,7 @@ Esempio di formato:
 - Fissa la CO2
 
 Testo:
-${trimmedText}`,
+${doc.text}`,
           },
         ],
       }),
@@ -111,7 +106,7 @@ ${trimmedText}`,
     if (start === -1) throw new Error("Formato mappa non valido");
     markdown = markdown.slice(start);
 
-    return NextResponse.json({ markdown });
+    return NextResponse.json({ markdown, truncated: doc.truncated, maxPages: doc.maxPages });
   } catch (err) {
     console.error("Mindmap error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
