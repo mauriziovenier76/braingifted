@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { createClient } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
+import SpeakButton from "../../components/SpeakButton";
 
 /* ---------- MAPPA MENTALE: dati di esempio e funzioni di export ---------- */
 
@@ -929,7 +930,8 @@ export default function Dashboard() {
                     <div className="summary-box">
                       <div className="summary-label">⚡ Riassunto AI</div>
                       <div className="summary-text">{result.summary}</div>
-                      <div style={{ marginTop: 20 }}>
+                      <div style={{ marginTop: 20, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <SpeakButton text={result.summary} label="Ascolta riassunto" />
                         <button onClick={handleExportWord} disabled={exportingWord} style={{ background: plan === "pro" ? "var(--lime)" : "transparent", color: plan === "pro" ? "#000" : "var(--muted)", border: plan === "pro" ? "none" : "1px solid var(--border)", padding: "8px 20px", borderRadius: "100px", fontFamily: "var(--font-body)", fontSize: "0.85rem", fontWeight: 500, cursor: "pointer" }}>
                           {exportingWord ? "⏳ Esportando..." : plan === "pro" ? "⬇️ Esporta in Word" : "🔒 Esporta in Word (Pro)"}
                         </button>
@@ -967,7 +969,13 @@ export default function Dashboard() {
                           <div className="fc-counter">{currentCard + 1} / {flashcards.length}</div>
                           <div className="fc-type">{flipped ? "RISPOSTA" : "DOMANDA"}</div>
                           <div className="fc-text">{flipped ? flashcards[currentCard].risposta : flashcards[currentCard].domanda}</div>
-                          {!flipped && <div className="fc-hint">Clicca per vedere la risposta</div>}
+                          <div style={{ marginTop: 16 }}>
+                            <SpeakButton
+                              text={flipped ? flashcards[currentCard].risposta : flashcards[currentCard].domanda}
+                              label={flipped ? "Ascolta risposta" : "Ascolta domanda"}
+                            />
+                          </div>
+                        {!flipped && <div className="fc-hint">Clicca per vedere la risposta</div>}
                         </div>
                         {flipped && (
                           <div className="fc-actions">
@@ -1061,6 +1069,9 @@ export default function Dashboard() {
                       <div className="summary-box">
                         <div className="summary-label">✨ Spiegazione</div>
                         <div className="summary-text">{explanation}</div>
+                        <div style={{ marginTop: 20 }}>
+                          <SpeakButton text={explanation} label="Ascolta spiegazione" />
+                        </div>
                       </div>
                     )}
                   </div>
