@@ -3,6 +3,35 @@ import { useEffect, useState, useRef } from "react";
 import { createClient } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
 import SpeakButton from "../../components/SpeakButton";
+import { PHOTO_LIMITS, TEXT_LIMITS } from "../../lib/limits";
+
+/* ---------- FOTO: compressione nel browser prima dell'invio ---------- */
+
+const PHOTOS_PER_REQUEST = 5; // deve corrispondere a MAX_PER_REQUEST in app/api/ocr/route.js
+
+// Rimpicciolisce la foto (lato lungo max 1568 px, come la usa Claude) e la salva in JPEG.
+// Così ogni foto pesa circa 200-400 KB invece di 2-4 MB.
+async function compressImage(file, maxSide = 1568, quality = 0.8) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("Formato foto non supportato. Usa JPG o PNG."));
+      i.src = url;
+    });
+    const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    if (!blob) throw new Error("Non sono riuscito a preparare una delle foto.");
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 /* ---------- MAPPA MENTALE: dati di esempio e funzioni di export ---------- */
 
@@ -174,7 +203,15 @@ export default function Dashboard() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
 
-  const fileRef = useRef(null);
+  // Foto
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState("");
+  const [photoText, setPhotoText] = useState("");     // testo letto dalle foto, da mostrare
+  const [truncatedPages, setTruncatedPages] = useState(0); // > 0 = documento più lungo del limite
+
+  const fileRef = useRef(null);        // il PDF caricato
+  const photoTextRef = useRef("");     // oppure: il testo trascritto dalle foto
+  const docNameRef = useRef("");       // nome del documento per lo storico
   const documentIdRef = useRef(null);
   const docPromiseRef = useRef(null);
   const fileInputRef = useRef();
@@ -258,8 +295,34 @@ export default function Dashboard() {
     return await response.json();
   };
 
+  // C'è un documento caricato? (PDF oppure foto già lette)
+  const hasDoc = () => !!(fileRef.current || photoTextRef.current);
+
+  // Aggiunge al form il PDF oppure il testo delle foto
+  const appendSource = (formData) => {
+    if (photoTextRef.current) formData.append("text", photoTextRef.current);
+    else formData.append("file", fileRef.current);
+    return formData;
+  };
+
+  // Se l'API dice che il documento era più lungo del limite, lo ricordiamo per mostrare l'avviso
+  const noteTruncated = (data) => {
+    if (data?.truncated) setTruncatedPages(data.maxPages || 0);
+  };
+
+  // Svuota tutti i risultati del documento precedente
+  const resetResults = () => {
+    documentIdRef.current = null;
+    docPromiseRef.current = null;
+    setError("");
+    setFlashcards([]); setQuestions([]); setSlides([]); setMindmapMd("");
+    setExplanation(""); setExplainText("");
+    setCurrentCard(0); setKnown([]); setAnswers({}); setSubmitted(false);
+    setTruncatedPages(0);
+  };
+
   const saveResult = async (feature, content) => {
-    if (!fileRef.current) return;
+    if (!hasDoc()) return;
 
     // Il documento nello storico viene creato al primo risultato generato
     if (!documentIdRef.current) {
@@ -268,7 +331,7 @@ export default function Dashboard() {
           const res = await fetch("/api/documents", {
             method: "POST",
             headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-            body: JSON.stringify({ fileName: fileRef.current.name, feature, content }),
+            body: JSON.stringify({ fileName: docNameRef.current, feature, content }),
           });
           const d = await res.json();
           if (d.document) documentIdRef.current = d.document.id;
@@ -294,33 +357,100 @@ export default function Dashboard() {
     loadHistory();
   };
 
-  /* ----- Upload + riassunto ----- */
+  /* ----- Upload: PDF oppure foto ----- */
+  const handleFiles = (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+
+    const pdfs = files.filter((f) => f.type === "application/pdf");
+    const images = files.filter((f) => f.type.startsWith("image/"));
+
+    if (pdfs.length && images.length) { setError("Carica un PDF oppure delle foto, non entrambi insieme."); return; }
+    if (pdfs.length > 1) { setError("Puoi caricare un solo PDF alla volta."); return; }
+    if (pdfs.length === 1) { handleFile(pdfs[0]); return; }
+    if (images.length) { handlePhotos(images); return; }
+    setError("Formato non supportato. Carica un PDF oppure foto JPG o PNG.");
+  };
+
   const handleFile = async (file) => {
-    if (!file || file.type !== "application/pdf") { setError("Per ora accettiamo solo file PDF."); return; }
     if (file.size > 10 * 1024 * 1024) { setError("Il file è troppo grande. Massimo 10MB."); return; }
 
     // Il PDF viene solo caricato: l'utente sceglie poi quale aiuto usare
     fileRef.current = file;
-    documentIdRef.current = null;
-    docPromiseRef.current = null;
-    setError("");
-    setFlashcards([]); setQuestions([]); setSlides([]); setMindmapMd("");
-    setExplanation(""); setExplainText("");
-    setCurrentCard(0); setKnown([]); setAnswers({}); setSubmitted(false);
+    photoTextRef.current = "";
+    docNameRef.current = file.name;
+    setPhotoText("");
+    resetResults();
     setResult({ fileName: file.name, summary: "" });
+  };
+
+  const handlePhotos = async (images) => {
+    const maxPhotos = PHOTO_LIMITS[plan] || PHOTO_LIMITS.free;
+    if (images.length > maxPhotos) {
+      setError(
+        plan === "pro"
+          ? `Puoi caricare al massimo ${maxPhotos} foto per documento.`
+          : `Con il piano Free puoi caricare al massimo ${maxPhotos} foto per documento. Con Pro arrivi a ${PHOTO_LIMITS.pro}.`
+      );
+      return;
+    }
+
+    // Ordine delle pagine = ordine dei nomi dei file (IMG_1, IMG_2, ... IMG_10)
+    const sorted = [...images].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+    resetResults();
+    setOcrLoading(true);
+    try {
+      setOcrProgress("Preparo le foto...");
+      const compressed = [];
+      for (const img of sorted) compressed.push(await compressImage(img));
+
+      // Le foto partono a gruppi di 5 (limite di peso di Vercel)
+      const parts = [];
+      const totalGroups = Math.ceil(compressed.length / PHOTOS_PER_REQUEST);
+      for (let i = 0; i < compressed.length; i += PHOTOS_PER_REQUEST) {
+        const group = compressed.slice(i, i + PHOTOS_PER_REQUEST);
+        const groupNumber = i / PHOTOS_PER_REQUEST + 1;
+        setOcrProgress(
+          totalGroups > 1
+            ? `Sto leggendo le foto (gruppo ${groupNumber} di ${totalGroups})...`
+            : "Sto leggendo le foto..."
+        );
+        const formData = new FormData();
+        group.forEach((f) => formData.append("photos", f));
+        const response = await fetch("/api/ocr", { method: "POST", headers: await authHeaders(), body: formData });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Errore nella lettura delle foto.");
+        parts.push(data.text);
+      }
+
+      const text = parts.join("\n\n");
+      const name = `Foto appunti (${sorted.length} foto)`;
+      fileRef.current = null;
+      photoTextRef.current = text;
+      docNameRef.current = name;
+      setPhotoText(text);
+      setResult({ fileName: name, summary: "", isPhotos: true });
+    } catch (err) {
+      setError(err.message || "Errore nella lettura delle foto.");
+    } finally {
+      setOcrLoading(false);
+      setOcrProgress("");
+    }
   };
 
   /* ----- Riassunto (su richiesta) ----- */
   const handleGenerateSummary = async () => {
-    if (!fileRef.current) return;
+    if (!hasDoc()) return;
 
     setLoadingSummary(true); setError("");
     try {
       const formData = new FormData();
-      formData.append("file", fileRef.current);
+      appendSource(formData);
       const response = await fetch("/api/summarize", { method: "POST", headers: await authHeaders(), body: formData });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Errore nella generazione del riassunto.");
+      noteTruncated(data);
       setResult(prev => ({ ...prev, summary: data.summary }));
       setActiveTab("summary");
       await saveResult("summary", { summary: data.summary });
@@ -333,16 +463,17 @@ export default function Dashboard() {
 
   /* ----- Flashcard ----- */
   const handleGenerateFlashcards = async () => {
-    if (!fileRef.current) return;
+    if (!hasDoc()) return;
 
 
     setLoadingFlashcards(true); setFlipped(false); setCurrentCard(0); setKnown([]);
     try {
       const formData = new FormData();
-      formData.append("file", fileRef.current);
+      appendSource(formData);
       const response = await fetch("/api/flashcards", { method: "POST", headers: await authHeaders(), body: formData });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Errore nella generazione delle flashcard.");
+      noteTruncated(data);
       setFlashcards(data.flashcards);
       setActiveTab("flashcards");
       await saveResult("flashcards", { flashcards: data.flashcards });
@@ -361,16 +492,17 @@ export default function Dashboard() {
 
   /* ----- Quiz ----- */
   const handleGenerateQuiz = async () => {
-    if (!fileRef.current) return;
+    if (!hasDoc()) return;
 
 
     setLoadingQuiz(true); setAnswers({}); setSubmitted(false);
     try {
       const formData = new FormData();
-      formData.append("file", fileRef.current);
+      appendSource(formData);
       const response = await fetch("/api/quiz", { method: "POST", headers: await authHeaders(), body: formData });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Errore nella generazione del quiz.");
+      noteTruncated(data);
       setQuestions(data.questions);
       setActiveTab("quiz");
       await saveResult("quiz", { questions: data.questions });
@@ -419,16 +551,17 @@ export default function Dashboard() {
 
   /* ----- Discorso ----- */
   const handleGenerateSlides = async () => {
-    if (!fileRef.current) return;
+    if (!hasDoc()) return;
 
 
     setLoadingSlides(true); setSlides([]);
     try {
       const formData = new FormData();
-      formData.append("file", fileRef.current);
+      appendSource(formData);
       const response = await fetch("/api/slides", { method: "POST", headers: await authHeaders(), body: formData });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Errore nella generazione delle slide.");
+      noteTruncated(data);
       setSlides(data.slides);
       setActiveTab("slides");
       await saveResult("slides", { slides: data.slides });
@@ -496,7 +629,7 @@ export default function Dashboard() {
 
   /* ----- Mappa mentale ----- */
   const handleGenerateMindmap = async () => {
-    if (!fileRef.current) return;
+    if (!hasDoc()) return;
 
     const usage = await checkUsage("mindmap");
     if (!usage.allowed) {
@@ -507,10 +640,11 @@ export default function Dashboard() {
     setLoadingMindmap(true);
     try {
       const formData = new FormData();
-      formData.append("file", fileRef.current);
+      appendSource(formData);
       const response = await fetch("/api/mindmap", { method: "POST", body: formData });
       if (!response.ok) throw new Error("Errore nella generazione della mappa.");
       const data = await response.json();
+      noteTruncated(data);
       setMindmapMd(data.markdown);
       setActiveTab("mindmap");
       await saveResult("mindmap", { markdown: data.markdown });
@@ -746,7 +880,7 @@ export default function Dashboard() {
 
             {!loadingHistory && documents.length === 0 && (
               <div className="summary-box" style={{ textAlign: "center" }}>
-                <p style={{ color: "var(--muted)" }}>Nessun documento ancora. Carica il tuo primo PDF!</p>
+                <p style={{ color: "var(--muted)" }}>Nessun documento ancora. Carica il tuo primo PDF o le foto dei tuoi appunti!</p>
               </div>
             )}
 
@@ -874,24 +1008,47 @@ export default function Dashboard() {
               </div>
             )}
 
-            {!result && (
+            {!result && ocrLoading && (
+              <div className="loading">
+                <div className="spinner"></div>
+                <p>{ocrProgress || "Sto leggendo le foto..."}</p>
+                <p style={{ fontSize: "0.8rem", marginTop: 8 }}>Può richiedere fino a mezzo minuto per ogni gruppo di 5 foto.</p>
+              </div>
+            )}
+
+            {!result && !ocrLoading && (
               <div
                 className={`upload-zone ${dragOver ? "drag-over" : ""}`}
                 onClick={() => fileInputRef.current.click()}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
+                onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
               >
-                <div className="upload-icon">📄</div>
+                <div className="upload-icon">📄 📷</div>
                 <div className="upload-title">Carica il tuo documento</div>
-                <div className="upload-subtitle">Trascina qui il file oppure clicca per sceglierlo</div>
-                <button className="btn-upload">Scegli PDF</button>
+                <div className="upload-subtitle">Un PDF oppure le foto dei tuoi appunti: trascinali qui o clicca per sceglierli</div>
+                <button className="btn-upload">Scegli PDF o foto</button>
                 <div className="upload-note">
                   {plan === "pro"
-                    ? "PDF · Max 10MB · Pagine illimitate · Piano Pro ⚡"
-                    : "PDF · Max 10MB · Fino a 15 pagine · Piano Free"}
+                    ? `PDF fino a 10MB · oppure fino a ${PHOTO_LIMITS.pro} foto · L'AI legge circa ${TEXT_LIMITS.pro.pages} pagine · Piano Pro ⚡`
+                    : `PDF fino a 10MB · oppure fino a ${PHOTO_LIMITS.free} foto · L'AI legge circa ${TEXT_LIMITS.free.pages} pagine · Piano Free`}
                 </div>
-                <input ref={fileInputRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={(e) => handleFile(e.target.files[0])} />
+                {plan !== "pro" && (
+                  <div className="upload-note" style={{ marginTop: 6 }}>
+                    Con Pro: fino a {PHOTO_LIMITS.pro} foto e circa {TEXT_LIMITS.pro.pages} pagine per documento.
+                  </div>
+                )}
+                <div className="upload-note" style={{ marginTop: 6 }}>
+                  Le foto vengono lette in ordine di nome del file. Fotografa un foglio alla volta, dritto e con buona luce.
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,image/jpeg,image/png,image/webp"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
+                />
               </div>
             )}
 
@@ -908,11 +1065,40 @@ export default function Dashboard() {
                       setResult(null); setFlashcards([]); setQuestions([]); setSlides([]);
                       setMindmapMd(""); setExplanation(""); setExplainText("");
                       fileRef.current = null; documentIdRef.current = null; docPromiseRef.current = null;
+                      photoTextRef.current = ""; docNameRef.current = "";
+                      setPhotoText(""); setTruncatedPages(0); setError("");
                     }}
                   >
                     + Nuovo
                   </button>
                 </div>
+
+                {/* Avviso: documento più lungo del limite del piano */}
+                {truncatedPages > 0 && (
+                  <div style={{ background: "rgba(255,190,60,0.08)", border: "1px solid rgba(255,190,60,0.3)", borderRadius: 12, padding: "14px 18px", color: "#ffbe3c", fontSize: "0.88rem", lineHeight: 1.6, marginBottom: 20 }}>
+                    📏 <strong>Documento lungo:</strong> BrainGifted ha letto circa le prime {truncatedPages} pagine, il limite del piano {plan === "pro" ? "Pro" : "Free"}.
+                    {plan === "pro"
+                      ? " Per il resto, carica la parte successiva come nuovo documento."
+                      : ` Con il piano Pro arrivi a circa ${TEXT_LIMITS.pro.pages} pagine.`}
+                    {plan !== "pro" && (
+                      <button onClick={handleUpgradeToPro} style={{ marginLeft: 10, background: "var(--lime)", color: "#000", border: "none", padding: "4px 14px", borderRadius: "100px", fontFamily: "var(--font-body)", fontSize: "0.8rem", fontWeight: 500, cursor: "pointer" }}>
+                        ⚡ Passa a Pro
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Testo letto dalle foto, per controllarlo */}
+                {photoText && (
+                  <details style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 18px", marginBottom: 20 }}>
+                    <summary style={{ cursor: "pointer", color: "var(--lime)", fontSize: "0.85rem" }}>
+                      📷 Vedi il testo letto dalle foto (controlla che sia giusto)
+                    </summary>
+                    <div className="summary-text" style={{ marginTop: 12, fontSize: "0.85rem", color: "var(--muted)", maxHeight: 360, overflowY: "auto" }}>
+                      {photoText}
+                    </div>
+                  </details>
+                )}
 
                 {tabsRow}
 
@@ -931,7 +1117,7 @@ export default function Dashboard() {
                       <div className="summary-label">⚡ Riassunto AI</div>
                       <div className="summary-text">{result.summary}</div>
                       <div style={{ marginTop: 20, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <SpeakButton text={result.summary} label="Ascolta riassunto" />
+                        <SpeakButton text={result.summary} label="Ascolta riassunto" />
                         <button onClick={handleExportWord} disabled={exportingWord} style={{ background: plan === "pro" ? "var(--lime)" : "transparent", color: plan === "pro" ? "#000" : "var(--muted)", border: plan === "pro" ? "none" : "1px solid var(--border)", padding: "8px 20px", borderRadius: "100px", fontFamily: "var(--font-body)", fontSize: "0.85rem", fontWeight: 500, cursor: "pointer" }}>
                           {exportingWord ? "⏳ Esportando..." : plan === "pro" ? "⬇️ Esporta in Word" : "🔒 Esporta in Word (Pro)"}
                         </button>
@@ -975,7 +1161,7 @@ export default function Dashboard() {
                               label={flipped ? "Ascolta risposta" : "Ascolta domanda"}
                             />
                           </div>
-                        {!flipped && <div className="fc-hint">Clicca per vedere la risposta</div>}
+                          {!flipped && <div className="fc-hint">Clicca per vedere la risposta</div>}
                         </div>
                         {flipped && (
                           <div className="fc-actions">
