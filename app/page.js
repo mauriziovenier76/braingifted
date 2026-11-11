@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { PHOTO_LIMITS, TEXT_LIMITS } from "../lib/limits";
 
 const quizPool = [
   { q: "Quale articolo disciplina la responsabilità contrattuale?", opts: ["Art. 1218 c.c.", "Art. 2043 c.c.", "Art. 1321 c.c.", "Art. 1372 c.c."], correct: 0 },
@@ -133,6 +134,14 @@ export default function Home() {
         .quiz-opt { padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border); font-size: 0.85rem; color: var(--muted); transition: all 0.2s; }
         .quiz-opt.correct { border-color: var(--lime); color: var(--lime); background: rgba(200,241,53,0.06); }
 
+        /* COME FUNZIONA */
+        .how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 56px; }
+        .how-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 32px; }
+        .how-icon { font-size: 1.8rem; margin-bottom: 16px; }
+        .how-card h3 { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 10px; }
+        .how-card p { color: var(--muted); font-size: 0.92rem; line-height: 1.7; }
+        .how-tag { display: inline-block; margin-top: 14px; font-size: 0.75rem; color: var(--lime); background: rgba(200,241,53,0.08); border: 1px solid rgba(200,241,53,0.2); border-radius: 100px; padding: 3px 12px; }
+
         /* PRICING */
         .pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 56px; }
         .pricing-card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 40px; position: relative; transition: transform 0.2s; }
@@ -175,6 +184,8 @@ export default function Home() {
           .nav-links { display: none; }
           .hero-stats { gap: 24px; }
           .tab-content { grid-template-columns: 1fr; }
+          .how-grid { grid-template-columns: 1fr; }
+          .hero-cta { flex-direction: column; }
           .pricing-grid { grid-template-columns: 1fr; }
           .cta-inner { padding: 48px 24px; }
           footer { flex-direction: column; gap: 16px; text-align: center; }
@@ -185,6 +196,7 @@ export default function Home() {
       <nav className={scrolled ? "scrolled" : ""}>
         <a href="#" className="nav-logo">Brain<span>Gifted</span></a>
         <div className="nav-links">
+          <a href="#come-funziona">Come funziona</a>
           <a href="#features">Funzioni</a>
           <a href="#pricing">Prezzi</a>
           <a href="/signup" className="btn-nav">Inizia gratis</a>
@@ -198,17 +210,43 @@ export default function Home() {
           Powered by AI · 6 strumenti di studio
         </div>
         <h1>Studia <em>meglio</em>,<br />impara di più.</h1>
-        <p>Carica il PDF dei tuoi appunti o del libro. BrainGifted lo trasforma in riassunti, flashcard, quiz, mappe mentali e discorsi in pochi secondi.</p>
+        <p>Carica un PDF o scatta una foto ai tuoi appunti. BrainGifted li trasforma in riassunti, flashcard, quiz, mappe mentali e discorsi, e te li legge anche ad alta voce.</p>
         <div className="hero-cta">
           <a href="/signup" className="btn-primary">Inizia gratis →</a>
-          <a href="#features" className="btn-ghost">Scopri come funziona</a>
+          <a href="#come-funziona" className="btn-ghost">Scopri come funziona</a>
         </div>
         <div className="hero-stats">
           <div className="stat"><div className="stat-num">6</div><div className="stat-label">strumenti di studio</div></div>
           <div className="stat"><div className="stat-num">€0</div><div className="stat-label">per iniziare</div></div>
-          <div className="stat"><div className="stat-num">100%</div><div className="stat-label">automatico</div></div>
+          <div className="stat"><div className="stat-num">📄 📷</div><div className="stat-label">PDF o foto degli appunti</div></div>
         </div>
       </div>
+
+      {/* COME FUNZIONA */}
+      <section id="come-funziona">
+        <p className="section-label">Come funziona</p>
+        <h2 className="section-title">Dal quaderno allo studio in tre passi.</h2>
+        <div className="how-grid">
+          <div className="how-card">
+            <div className="how-icon">📷</div>
+            <h3>1. Carica i tuoi appunti</h3>
+            <p>Un PDF, oppure le foto dei fogli fatte col telefono. BrainGifted legge anche il testo stampato, evidenziato e le note a mano.</p>
+            <span className="how-tag">Fino a {PHOTO_LIMITS.free} foto gratis · {PHOTO_LIMITS.pro} con Pro</span>
+          </div>
+          <div className="how-card">
+            <div className="how-icon">⚡</div>
+            <h3>2. Scegli come studiare</h3>
+            <p>Riassunto, flashcard, quiz, mappa mentale o la scaletta per l'interrogazione. Generati solo da quello che hai caricato tu.</p>
+            <span className="how-tag">6 strumenti di studio</span>
+          </div>
+          <div className="how-card">
+            <div className="how-icon">🔊</div>
+            <h3>3. Leggi o ascolta</h3>
+            <p>Ogni riassunto, flashcard e spiegazione si può ascoltare ad alta voce. Utile per ripassare e per chi studia meglio ascoltando, come molti ragazzi DSA.</p>
+            <span className="how-tag">Gratis per tutti</span>
+          </div>
+        </div>
+      </section>
 
       {/* FEATURES */}
       <div className="features-section" id="features">
@@ -236,10 +274,10 @@ export default function Home() {
               <>
                 <div className="tab-text">
                   <h3>Riassunti automatici istantanei</h3>
-                  <p>Carica il tuo PDF e ottieni in pochi secondi un riassunto chiaro, con i concetti principali messi in evidenza.</p>
+                  <p>Carica il tuo PDF o le foto degli appunti e ottieni in pochi secondi un riassunto chiaro, con i concetti principali messi in evidenza.</p>
                   <div className="tab-perks">
                     <div className="perk"><div className="perk-icon">✦</div>Punti chiave in evidenza</div>
-                    <div className="perk"><div className="perk-icon">✦</div>Riassunto chiaro e ordinato</div>
+                    <div className="perk"><div className="perk-icon">✦</div>Da ascoltare ad alta voce 🔊</div>
                     <div className="perk"><div className="perk-icon">✦</div>Export in Word (Pro)</div>
                   </div>
                 </div>
@@ -270,7 +308,7 @@ export default function Home() {
                   <div className="tab-perks">
                     <div className="perk"><div className="perk-icon">✦</div>Domande e risposte automatiche</div>
                     <div className="perk"><div className="perk-icon">✦</div>Sistema sapevo/non sapevo per il ripasso</div>
-                    <div className="perk"><div className="perk-icon">✦</div>Punteggio a fine sessione</div>
+                    <div className="perk"><div className="perk-icon">✦</div>Domanda e risposta da ascoltare 🔊</div>
                   </div>
                 </div>
                 <div className="tab-visual">
@@ -414,11 +452,14 @@ export default function Home() {
             <div className="pricing-price">€0<span>/mese</span></div>
             <div className="pricing-desc">Perfetto per provare BrainGifted e capire se fa per te.</div>
             <div className="pricing-features">
+              <div className="pricing-feature"><span className="check">✓</span> PDF o fino a {PHOTO_LIMITS.free} foto per documento</div>
+              <div className="pricing-feature"><span className="check">✓</span> Documenti fino a circa {TEXT_LIMITS.free.pages} pagine</div>
               <div className="pricing-feature"><span className="check">✓</span> 3 riassunti al mese</div>
               <div className="pricing-feature"><span className="check">✓</span> 3 set di flashcard al mese (10 carte)</div>
               <div className="pricing-feature"><span className="check">✓</span> 3 quiz al mese (10 domande)</div>
               <div className="pricing-feature"><span className="check">✓</span> 3 discorsi al mese (7 slide)</div>
               <div className="pricing-feature"><span className="check">✓</span> Storico degli ultimi 3 documenti</div>
+              <div className="pricing-feature"><span className="check">✓</span> Lettura ad alta voce 🔊</div>
               <div className="pricing-feature disabled"><span className="cross">✗</span> Mappe mentali</div>
               <div className="pricing-feature disabled"><span className="cross">✗</span> Spiegazione semplificata</div>
               <div className="pricing-feature disabled"><span className="cross">✗</span> Export Word e PowerPoint</div>
@@ -431,6 +472,8 @@ export default function Home() {
             <div className="pricing-price"><sup>€</sup>7<span>/mese</span></div>
             <div className="pricing-desc">Per chi studia seriamente e vuole il massimo dalle proprie sessioni.</div>
             <div className="pricing-features">
+              <div className="pricing-feature"><span className="check">✓</span> PDF o fino a {PHOTO_LIMITS.pro} foto per documento</div>
+              <div className="pricing-feature"><span className="check">✓</span> Documenti fino a circa {TEXT_LIMITS.pro.pages} pagine</div>
               <div className="pricing-feature"><span className="check">✓</span> Riassunti, flashcard e quiz illimitati</div>
               <div className="pricing-feature"><span className="check">✓</span> Discorsi da 10 slide con 5 punti chiave</div>
               <div className="pricing-feature"><span className="check">✓</span> Mappe mentali + export PNG e SVG</div>
@@ -438,6 +481,7 @@ export default function Home() {
               <div className="pricing-feature"><span className="check">✓</span> Export Word del riassunto</div>
               <div className="pricing-feature"><span className="check">✓</span> Export PowerPoint del discorso</div>
               <div className="pricing-feature"><span className="check">✓</span> Storico completo dei documenti</div>
+              <div className="pricing-feature"><span className="check">✓</span> Lettura ad alta voce 🔊</div>
             </div>
             <a href="/signup" className="btn-pricing solid">Inizia e passa a Pro →</a>
           </div>
@@ -448,7 +492,7 @@ export default function Home() {
       <div className="cta-section">
         <div className="cta-inner">
           <h2>Pronto a studiare in modo più intelligente?</h2>
-          <p>Carica il tuo primo PDF e scopri come prepararti meglio, in meno tempo.</p>
+          <p>Carica il tuo primo PDF o fotografa i tuoi appunti, e scopri come prepararti meglio in meno tempo.</p>
           <a href="/signup" className="btn-primary">Inizia gratis — nessuna carta richiesta</a>
         </div>
       </div>
