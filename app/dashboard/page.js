@@ -209,6 +209,21 @@ export default function Dashboard() {
   const [photoText, setPhotoText] = useState("");     // testo letto dalle foto, da mostrare
   const [truncatedPages, setTruncatedPages] = useState(0); // > 0 = documento più lungo del limite
 
+  // Lettura facilitata (ricordata nel browser dello studente)
+  const [easyRead, setEasyRead] = useState(false);
+
+  useEffect(() => {
+    try { setEasyRead(localStorage.getItem("bg-easy-read") === "1"); } catch {}
+  }, []);
+
+  useEffect(() => {
+    // La classe va sull'<html>, così si ingrandisce tutto il testo della pagina
+    document.documentElement.classList.toggle("easy-read", easyRead);
+    try { localStorage.setItem("bg-easy-read", easyRead ? "1" : "0"); } catch {}
+    // Uscendo dalla dashboard (es. verso la home) si torna alla grafica normale
+    return () => document.documentElement.classList.remove("easy-read");
+  }, [easyRead]);
+
   const fileRef = useRef(null);        // il PDF caricato
   const photoTextRef = useRef("");     // oppure: il testo trascritto dalle foto
   const docNameRef = useRef("");       // nome del documento per lo storico
@@ -750,6 +765,7 @@ export default function Dashboard() {
       <style>{`
         @import url('https://api.fontshare.com/v2/css?f[]=clash-display@600,700&f[]=satoshi@300,400,500&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
           --lime: #c8f135; --bg: #0a0a0a; --surface: #111111; --surface2: #1a1a1a;
@@ -757,6 +773,32 @@ export default function Dashboard() {
           --font-display: 'Clash Display', sans-serif; --font-body: 'Satoshi', sans-serif;
         }
         body { background: var(--bg); color: var(--text); font-family: var(--font-body); }
+
+        /* ---------- LETTURA FACILITATA ---------- */
+        /* Font ad alta leggibilità, testo più grande, più spazio, più contrasto */
+        html.easy-read {
+          font-size: 112.5%;
+          --font-display: 'Atkinson Hyperlegible', sans-serif;
+          --font-body: 'Atkinson Hyperlegible', sans-serif;
+          --text: #ffffff;
+          --muted: #b8b8b8;
+          --border: #3a3a3a;
+        }
+        html.easy-read body { letter-spacing: 0.03em; word-spacing: 0.12em; }
+        html.easy-read h1, html.easy-read .logo { letter-spacing: 0; }
+        html.easy-read .summary-text,
+        html.easy-read .fc-text,
+        html.easy-read .quiz-q,
+        html.easy-read .quiz-opt,
+        html.easy-read p,
+        html.easy-read textarea { line-height: 2 !important; }
+        html.easy-read .summary-text { font-size: 1.05rem; max-width: 68ch; text-align: left; }
+        html.easy-read .fc-text { font-family: var(--font-body); font-size: 1.25rem; font-weight: 400; letter-spacing: 0.03em; }
+        html.easy-read .quiz-q { font-size: 1.1rem; }
+        html.easy-read .quiz-opt { font-size: 1rem; }
+        html.easy-read em, html.easy-read i { font-style: normal; }
+        .btn-easy { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 8px 18px; border-radius: 100px; font-family: var(--font-body); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+        .btn-easy.on { background: rgba(200,241,53,0.12); border-color: rgba(200,241,53,0.5); color: var(--lime); }
         .page { min-height: 100vh; padding: 32px 24px; max-width: 1280px; width: 100%; margin: 0 auto; }
         @media (min-width: 1500px) { .page { max-width: 1440px; } }
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 48px; flex-wrap: wrap; gap: 12px; }
@@ -842,6 +884,14 @@ export default function Dashboard() {
         <div className="header">
           <div className="logo">Brain<span>Gifted</span></div>
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              className={`btn-easy ${easyRead ? "on" : ""}`}
+              onClick={() => setEasyRead(!easyRead)}
+              aria-pressed={easyRead}
+              title="Font ad alta leggibilità, testo più grande e più spaziato"
+            >
+              Aa {easyRead ? "Lettura facilitata: attiva" : "Lettura facilitata"}
+            </button>
             <button
               onClick={() => setView(view === "upload" ? "history" : "upload")}
               style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", padding: "8px 20px", borderRadius: "100px", fontFamily: "var(--font-body)", fontSize: "0.85rem", cursor: "pointer", transition: "all 0.2s" }}
