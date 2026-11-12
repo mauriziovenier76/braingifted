@@ -129,10 +129,19 @@ function download(blob, name) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// Mostra il **grassetto** del testo AI come grassetto vero (invece degli asterischi)
+function renderRich(text) {
+  return (text || "").split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") && part.length > 4
+      ? <strong key={i} style={{ color: "var(--lime)", fontWeight: 700 }}>{part.slice(2, -2)}</strong>
+      : part
+  );
+}
+
 const TAB_INFO = {
   summary: {
     icon: "📝", title: "Riassunto", badge: "",
-    text: "Un riassunto chiaro e ordinato del tuo documento, con i concetti principali in evidenza. Perfetto per avere subito il quadro d'insieme prima di iniziare a studiare.",
+    text: "Un riassunto chiaro e ordinato del tuo documento, con i concetti principali in evidenza. Perfetto per avere subito il quadro d'insieme prima di iniziare a studiare. Scegli \"Semplificato\" per frasi brevi, parole semplici e termini difficili spiegati.",
   },
   flashcards: {
     icon: "🃏", title: "Flashcard", badge: "",
@@ -216,13 +225,22 @@ export default function Dashboard() {
   // Velocità della voce: "slow" | "normal" | "fast" (anche questa ricordata nel browser)
   const [speechRate, setSpeechRate] = useState("normal");
 
+  // Tipo di riassunto: "normal" | "simple" (ricordato nel browser come gli altri strumenti DSA)
+  const [summaryMode, setSummaryMode] = useState("normal");
+
   useEffect(() => {
     try {
       setEasyRead(localStorage.getItem("bg-easy-read") === "1");
       const r = localStorage.getItem("bg-speech-rate");
       if (SPEECH_RATES[r]) setSpeechRate(r);
+      if (localStorage.getItem("bg-summary-mode") === "simple") setSummaryMode("simple");
     } catch {}
   }, []);
+
+  const changeSummaryMode = (m) => {
+    setSummaryMode(m);
+    try { localStorage.setItem("bg-summary-mode", m); } catch {}
+  };
 
   const changeSpeechRate = (r) => {
     setSpeechRate(r);
@@ -468,20 +486,22 @@ export default function Dashboard() {
   };
 
   /* ----- Riassunto (su richiesta) ----- */
-  const handleGenerateSummary = async () => {
+  const handleGenerateSummary = async (mode = summaryMode) => {
     if (!hasDoc()) return;
+    if (mode !== summaryMode) changeSummaryMode(mode);
 
     setLoadingSummary(true); setError("");
     try {
       const formData = new FormData();
       appendSource(formData);
+      formData.append("mode", mode);
       const response = await fetch("/api/summarize", { method: "POST", headers: await authHeaders(), body: formData });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Errore nella generazione del riassunto.");
       noteTruncated(data);
-      setResult(prev => ({ ...prev, summary: data.summary }));
+      setResult(prev => ({ ...prev, summary: data.summary, summaryMode: data.mode || mode }));
       setActiveTab("summary");
-      await saveResult("summary", { summary: data.summary });
+      await saveResult("summary", { summary: data.summary, mode: data.mode || mode });
     } catch (err) {
       setError(err.message || "Qualcosa è andato storto.");
     } finally {
@@ -789,6 +809,23 @@ export default function Dashboard() {
     </div>
   );
 
+  // Interruttore Normale / Semplificato, prima di generare il riassunto
+  const summaryModeSwitch = (
+    <div style={{ display: "inline-flex", gap: 4, padding: 4, border: "1px solid var(--border)", borderRadius: 100, marginTop: 4 }} role="radiogroup" aria-label="Tipo di riassunto">
+      {[["normal", "📝 Normale"], ["simple", "✨ Semplificato"]].map(([key, label]) => (
+        <button
+          key={key}
+          role="radio"
+          aria-checked={summaryMode === key}
+          onClick={() => changeSummaryMode(key)}
+          style={{ background: summaryMode === key ? "var(--lime)" : "transparent", color: summaryMode === key ? "#000" : "var(--muted)", border: "none", padding: "8px 18px", borderRadius: 100, fontFamily: "var(--font-body)", fontSize: "0.85rem", fontWeight: 500, cursor: "pointer" }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
   const featureLabel = (f) =>
     f === "summary" ? "📝 Riassunto" :
     f === "flashcards" ? "🃏 Flashcard" :
@@ -996,7 +1033,7 @@ export default function Dashboard() {
                             </div>
 
                             {r.feature === "summary" && (
-                              <div style={{ fontSize: "0.9rem", lineHeight: 1.8, color: "var(--text)", whiteSpace: "pre-wrap" }}>{r.content.summary}</div>
+                              <div style={{ fontSize: "0.9rem", lineHeight: 1.8, color: "var(--text)", whiteSpace: "pre-wrap" }}>{renderRich(r.content.summary)}</div>
                             )}
 
                             {r.feature === "flashcards" && (
@@ -1188,14 +1225,19 @@ export default function Dashboard() {
                     {!loadingSummary && !result.summary && (
                       <div className="summary-box" style={{ textAlign: "center" }}>
                         {renderIntro("summary")}
-                        <button className="btn-generate" onClick={handleGenerateSummary}>📝 Genera riassunto</button>
+                        {summaryModeSwitch}
+                        <button className="btn-generate" onClick={() => handleGenerateSummary()}>
+                          {summaryMode === "simple" ? "✨ Genera riassunto semplificato" : "📝 Genera riassunto"}
+                        </button>
                       </div>
                     )}
                     {!loadingSummary && result.summary && (<>
                     {readingTools()}
                     <div className="summary-box">
-                      <div className="summary-label">⚡ Riassunto AI</div>
-                      <div className="summary-text">{result.summary}</div>
+                      <div className="summary-label">
+                        {result.summaryMode === "simple" ? "✨ Riassunto semplificato" : "⚡ Riassunto AI"}
+                      </div>
+                      <div className="summary-text">{renderRich(result.summary)}</div>
                       <div style={{ marginTop: 20, display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <SpeakButton text={result.summary} label="Ascolta riassunto" />
                         <button onClick={handleExportWord} disabled={exportingWord} style={{ background: plan === "pro" ? "var(--lime)" : "transparent", color: plan === "pro" ? "#000" : "var(--muted)", border: plan === "pro" ? "none" : "1px solid var(--border)", padding: "8px 20px", borderRadius: "100px", fontFamily: "var(--font-body)", fontSize: "0.85rem", fontWeight: 500, cursor: "pointer" }}>
@@ -1203,6 +1245,9 @@ export default function Dashboard() {
                         </button>
                       </div>
                     </div>
+                    <button className="btn-generate" onClick={() => handleGenerateSummary(result.summaryMode === "simple" ? "normal" : "simple")}>
+                      {result.summaryMode === "simple" ? "📝 Rifallo in versione normale" : "✨ Rifallo in versione semplificata"}
+                    </button>
                     <button className="btn-generate" onClick={handleGenerateFlashcards} disabled={loadingFlashcards}>
                       {loadingFlashcards ? "⏳ Generando flashcard..." : "🃏 Genera flashcard"}
                     </button>
