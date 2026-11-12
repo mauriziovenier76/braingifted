@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { createClient } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
 import SpeakButton, { SPEECH_RATES } from "../../components/SpeakButton";
+import ProfileMenu from "../../components/ProfileMenu";
 import { PHOTO_LIMITS, TEXT_LIMITS } from "../../lib/limits";
 
 /* ---------- FOTO: compressione nel browser prima dell'invio ---------- */
@@ -758,6 +759,36 @@ export default function Dashboard() {
     </div>
   );
 
+  // Strumenti di lettura DSA: compaiono solo nelle tab dove c'è testo da leggere/ascoltare.
+  // voice = true mostra anche la velocità della voce (solo dove c'è il bottone Ascolta)
+  const readingTools = ({ voice = true } = {}) => (
+    <div className="reading-tools">
+      <button
+        className={`btn-easy ${easyRead ? "on" : ""}`}
+        onClick={() => setEasyRead(!easyRead)}
+        aria-pressed={easyRead}
+        title="Font ad alta leggibilità, testo più grande e più spaziato"
+      >
+        Aa {easyRead ? "Lettura facilitata: attiva" : "Lettura facilitata"}
+      </button>
+      {voice && (
+        <label className="btn-easy" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} title="Velocità della lettura ad alta voce">
+          🔊 Velocità voce
+          <select
+            value={speechRate}
+            onChange={(e) => changeSpeechRate(e.target.value)}
+            aria-label="Velocità della voce"
+            style={{ background: "transparent", color: "var(--text)", border: "none", fontFamily: "inherit", fontSize: "inherit", cursor: "pointer", outline: "none" }}
+          >
+            {Object.entries(SPEECH_RATES).map(([key, r]) => (
+              <option key={key} value={key} style={{ background: "#111", color: "#f0f0f0" }}>{r.label}</option>
+            ))}
+          </select>
+        </label>
+      )}
+    </div>
+  );
+
   const featureLabel = (f) =>
     f === "summary" ? "📝 Riassunto" :
     f === "flashcards" ? "🃏 Flashcard" :
@@ -811,6 +842,7 @@ export default function Dashboard() {
         html.easy-read em, html.easy-read i { font-style: normal; }
         .btn-easy { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 8px 18px; border-radius: 100px; font-family: var(--font-body); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
         .btn-easy.on { background: rgba(200,241,53,0.12); border-color: rgba(200,241,53,0.5); color: var(--lime); }
+        .reading-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
         .page { min-height: 100vh; padding: 32px 24px; max-width: 1280px; width: 100%; margin: 0 auto; }
         @media (min-width: 1500px) { .page { max-width: 1440px; } }
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 48px; flex-wrap: wrap; gap: 12px; }
@@ -892,58 +924,30 @@ export default function Dashboard() {
       `}</style>
 
       <div className="page">
-        {/* HEADER */}
+        {/* HEADER: logo a sinistra, icona profilo a destra */}
         <div className="header">
           <div className="logo">Brain<span>Gifted</span></div>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-            <button
-              className={`btn-easy ${easyRead ? "on" : ""}`}
-              onClick={() => setEasyRead(!easyRead)}
-              aria-pressed={easyRead}
-              title="Font ad alta leggibilità, testo più grande e più spaziato"
-            >
-              Aa {easyRead ? "Lettura facilitata: attiva" : "Lettura facilitata"}
-            </button>
-            <label className="btn-easy" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} title="Velocità della lettura ad alta voce">
-              🔊 Voce
-              <select
-                value={speechRate}
-                onChange={(e) => changeSpeechRate(e.target.value)}
-                aria-label="Velocità della voce"
-                style={{ background: "transparent", color: "var(--text)", border: "none", fontFamily: "inherit", fontSize: "inherit", cursor: "pointer", outline: "none" }}
-              >
-                {Object.entries(SPEECH_RATES).map(([key, r]) => (
-                  <option key={key} value={key} style={{ background: "#111", color: "#f0f0f0" }}>{r.label}</option>
-                ))}
-              </select>
-            </label>
-            <button
-              onClick={() => setView(view === "upload" ? "history" : "upload")}
-              style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", padding: "8px 20px", borderRadius: "100px", fontFamily: "var(--font-body)", fontSize: "0.85rem", cursor: "pointer", transition: "all 0.2s" }}
-            >
-              {view === "upload" ? "📚 Storico" : "⬆️ Nuovo"}
-            </button>
-            {plan === "pro" ? (
-              <span style={{ background: "rgba(200,241,53,0.1)", color: "var(--lime)", border: "1px solid rgba(200,241,53,0.3)", padding: "8px 20px", borderRadius: "100px", fontSize: "0.85rem", fontWeight: 500 }}>
-                ⚡ Piano Pro
-              </span>
-            ) : (
-              <button onClick={handleUpgradeToPro} style={{ background: "var(--lime)", color: "#000", border: "none", padding: "8px 20px", borderRadius: "100px", fontFamily: "var(--font-body)", fontSize: "0.85rem", fontWeight: 500, cursor: "pointer" }}>
-                ⚡ Passa a Pro
-              </button>
-            )}
-            <button className="btn-logout" onClick={handleLogout}>Esci</button>
-          </div>
+          <ProfileMenu
+            email={user.email}
+            plan={plan}
+            view={view}
+            onToggleView={() => setView(view === "upload" ? "history" : "upload")}
+            onUpgrade={handleUpgradeToPro}
+            onLogout={handleLogout}
+          />
         </div>
 
         <h1>Ciao! 👋</h1>
-        <p className="subtitle">Loggato come <span className="email">{user.email}</span></p>
+        <p className="subtitle">Carica un documento e scegli come vuoi studiarlo.</p>
 
         {error && <div className="error-box">⚠️ {error}</div>}
 
         {/* ---------- STORICO ---------- */}
         {view === "history" && (
           <div>
+            <button className="btn-new" onClick={() => setView("upload")} style={{ marginBottom: 20 }}>
+              ← Torna al documento
+            </button>
             <h2 style={{ fontFamily: "var(--font-display)", fontSize: "1.8rem", fontWeight: 700, letterSpacing: "-1px", marginBottom: 8 }}>
               I tuoi documenti 📚
             </h2>
@@ -1188,6 +1192,7 @@ export default function Dashboard() {
                       </div>
                     )}
                     {!loadingSummary && result.summary && (<>
+                    {readingTools()}
                     <div className="summary-box">
                       <div className="summary-label">⚡ Riassunto AI</div>
                       <div className="summary-text">{result.summary}</div>
@@ -1220,6 +1225,7 @@ export default function Dashboard() {
                     )}
                     {!loadingFlashcards && flashcards.length > 0 && !isLastCard && (
                       <div>
+                        {readingTools()}
                         <div className="fc-progress">
                           {flashcards.map((_, i) => {
                             const k = known.find(k => k.index === i);
@@ -1269,6 +1275,7 @@ export default function Dashboard() {
                     )}
                     {!loadingQuiz && questions.length > 0 && (
                       <div>
+                        {readingTools({ voice: false })}
                         <div className="quiz-list">
                           {questions.map((q, qi) => (
                             <div key={qi} className="quiz-item">
@@ -1313,6 +1320,7 @@ export default function Dashboard() {
                 {/* SPIEGAZIONI */}
                 {activeTab === "explain" && (
                   <div>
+                    {readingTools({ voice: !!explanation })}
                     <div className="summary-box" style={{ marginBottom: 16 }}>
                       {renderIntro("explain")}
                       <textarea
