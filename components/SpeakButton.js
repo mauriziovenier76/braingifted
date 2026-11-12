@@ -17,6 +17,22 @@ function splitSentences(text) {
   return parts.map((p) => p.trim()).filter(Boolean);
 }
 
+// Velocità della voce scelta dallo studente (salvata nel browser dalla dashboard)
+export const SPEECH_RATES = {
+  slow: { label: "Lenta", rate: 0.75 },
+  normal: { label: "Normale", rate: 0.95 },
+  fast: { label: "Veloce", rate: 1.2 },
+};
+
+function currentRate() {
+  try {
+    const key = localStorage.getItem("bg-speech-rate");
+    return (SPEECH_RATES[key] || SPEECH_RATES.normal).rate;
+  } catch {
+    return SPEECH_RATES.normal.rate;
+  }
+}
+
 // Cerca una voce italiana tra quelle installate
 function pickItalianVoice() {
   const voices = window.speechSynthesis.getVoices();
@@ -97,7 +113,7 @@ export default function SpeakButton({ text, label = "Ascolta" }) {
     u.lang = "it-IT";
     const voice = pickItalianVoice();
     if (voice) u.voice = voice;
-    u.rate = 0.95; // un filo più lento del normale
+    u.rate = currentRate(); // letta a ogni frase: se lo studente la cambia, vale dalla frase dopo
     u.onend = () => {
       if (sessionRef.current !== session) return;
       indexRef.current++;

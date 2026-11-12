@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { createClient } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
-import SpeakButton from "../../components/SpeakButton";
+import SpeakButton, { SPEECH_RATES } from "../../components/SpeakButton";
 import { PHOTO_LIMITS, TEXT_LIMITS } from "../../lib/limits";
 
 /* ---------- FOTO: compressione nel browser prima dell'invio ---------- */
@@ -212,9 +212,21 @@ export default function Dashboard() {
   // Lettura facilitata (ricordata nel browser dello studente)
   const [easyRead, setEasyRead] = useState(false);
 
+  // Velocità della voce: "slow" | "normal" | "fast" (anche questa ricordata nel browser)
+  const [speechRate, setSpeechRate] = useState("normal");
+
   useEffect(() => {
-    try { setEasyRead(localStorage.getItem("bg-easy-read") === "1"); } catch {}
+    try {
+      setEasyRead(localStorage.getItem("bg-easy-read") === "1");
+      const r = localStorage.getItem("bg-speech-rate");
+      if (SPEECH_RATES[r]) setSpeechRate(r);
+    } catch {}
   }, []);
+
+  const changeSpeechRate = (r) => {
+    setSpeechRate(r);
+    try { localStorage.setItem("bg-speech-rate", r); } catch {}
+  };
 
   useEffect(() => {
     // La classe va sull'<html>, così si ingrandisce tutto il testo della pagina
@@ -892,6 +904,19 @@ export default function Dashboard() {
             >
               Aa {easyRead ? "Lettura facilitata: attiva" : "Lettura facilitata"}
             </button>
+            <label className="btn-easy" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} title="Velocità della lettura ad alta voce">
+              🔊 Voce
+              <select
+                value={speechRate}
+                onChange={(e) => changeSpeechRate(e.target.value)}
+                aria-label="Velocità della voce"
+                style={{ background: "transparent", color: "var(--text)", border: "none", fontFamily: "inherit", fontSize: "inherit", cursor: "pointer", outline: "none" }}
+              >
+                {Object.entries(SPEECH_RATES).map(([key, r]) => (
+                  <option key={key} value={key} style={{ background: "#111", color: "#f0f0f0" }}>{r.label}</option>
+                ))}
+              </select>
+            </label>
             <button
               onClick={() => setView(view === "upload" ? "history" : "upload")}
               style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", padding: "8px 20px", borderRadius: "100px", fontFamily: "var(--font-body)", fontSize: "0.85rem", cursor: "pointer", transition: "all 0.2s" }}
