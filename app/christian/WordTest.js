@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
+import { createClient } from "../../lib/supabase";
 
-const STORAGE_KEY = "bg-christian-words";
+const API_URL = "/api/christian-words";
 const HEADER_WORDS = ["italiano", "inglese", "italian", "english", "ita", "eng", "parola", "traduzione"];
 
 // Normalizza una risposta: niente maiuscole, niente spazi in più
@@ -48,6 +49,9 @@ function parseWorkbook(arrayBuffer) {
 
 export default function WordTest() {
   const [words, setWords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
   const [loadInfo, setLoadInfo] = useState("");
   const [error, setError] = useState("");
   const [count, setCount] = useState(10);
@@ -63,16 +67,32 @@ export default function WordTest() {
   const fileInputRef = useRef(null);
   const answerRef = useRef(null);
   const nextRef = useRef(null);
+  const supabase = createClient();
 
-  // All'apertura recupera l'ultima lista caricata su questo dispositivo
+  // Se sei loggato, manda il token: così il server capisce se sei l'amministratore
+  const authHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session ? { Authorization: `Bearer ${session.access_token}` } : {};
+  };
+
+  // All'apertura scarica la lista dal server
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-      if (Array.isArray(saved) && saved.length) {
-        setWords(saved);
-        setCount(Math.min(10, saved.length));
+    (async () => {
+      try {
+        const res = await fetch(API_URL, { headers: await authHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        const list = data.words || [];
+        setWords(list);
+        setCount(Math.min(10, list.length) || 10);
+        setCanEdit(!!data.canEdit);
+      } catch (err) {
+        console.error(err);
+        setError("Non riesco a caricare la lista di parole. Riprova tra poco.");
+      } finally {
+        setLoading(false);
       }
-    } catch {}
+    })();
   }, []);
 
   // Mette il cursore nel campo giusto a ogni domanda
@@ -85,21 +105,40 @@ export default function WordTest() {
   const handleFile = async (file) => {
     if (!file) return;
     setError(""); setLoadInfo("");
+    let parsed;
     try {
-      const { words: list, duplicates } = parseWorkbook(await file.arrayBuffer());
-      if (!list.length) {
-        setError("Non ho trovato parole nel file. Servono 2 colonne: italiano (A) e inglese (B).");
-        return;
-      }
-      setWords(list);
-      setCount(Math.min(10, list.length));
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
-      setLoadInfo(`✅ Caricate ${list.length} parole${duplicates ? ` (${duplicates} doppioni ignorati)` : ""}.`);
+      parsed = parseWorkbook(await file.arrayBuffer());
     } catch (err) {
       console.error(err);
       setError("Non riesco a leggere il file. Usa un file Excel (.xlsx o .xls) oppure .csv.");
+      return;
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+
+    const { words: list, duplicates } = parsed;
+    if (!list.length) {
+      setError("Non ho trovato parole nel file. Servono 2 colonne: italiano (A) e inglese (B).");
+      return;
+    }
+
+    // Salva la lista sul server, così Christian la trova da qualsiasi dispositivo
+    setSaving(true);
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+        body: JSON.stringify({ words: list }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Salvataggio non riuscito.");
+      setWords(data.words);
+      setCount(Math.min(10, data.words.length));
+      setLoadInfo(`✅ Salvate ${data.words.length} parole${duplicates ? ` (${duplicates} doppioni ignorati)` : ""}. Christian le vede già.`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -164,26 +203,36 @@ export default function WordTest() {
           {error && <div className="wt-error">⚠️ {error}</div>}
 
           {/* ---------- PREPARAZIONE ---------- */}
-          {phase === "setup" && (
+          {phase === "setup" && loading && (
+            <div className="wt-card"><p className="wt-muted">Caricamento delle parole...</p></div>
+          )}
+
+          {phase === "setup" && !loading && (
             <>
+              {!canEdit && words.length === 0 && (
+                <div className="wt-card"><p className="wt-muted">La lista di parole non è ancora pronta. Riprova più tardi! 📚</p></div>
+              )}
+
+              {canEdit && (
               <div className="wt-card">
                 <div className="wt-label">1 · Lista di parole</div>
                 <p className="wt-muted" style={{ marginBottom: 16 }}>
-                  File Excel con 2 colonne: <strong>A = italiano</strong>, <strong>B = inglese</strong>. Puoi ricaricarlo quando vuoi: la nuova lista sostituisce la vecchia.
+                  File Excel con 2 colonne: <strong>A = italiano</strong>, <strong>B = inglese</strong>. Puoi ricaricarlo quando vuoi: la nuova lista sostituisce la vecchia per tutti.
                 </p>
                 <div className="wt-row">
-                  <button className="wt-btn-ghost" onClick={() => fileInputRef.current?.click()}>
-                    📄 {words.length ? "Ricarica file" : "Carica file Excel"}
+                  <button className="wt-btn-ghost" onClick={() => fileInputRef.current?.click()} disabled={saving}>
+                    {saving ? "⏳ Salvataggio..." : `📄 ${words.length ? "Ricarica file" : "Carica file Excel"}`}
                   </button>
                   <span className="wt-muted">{words.length ? `${words.length} parole pronte` : "Nessuna lista caricata"}</span>
                 </div>
                 {loadInfo && <p style={{ marginTop: 12, color: "#c8f135", fontSize: "0.9rem" }}>{loadInfo}</p>}
                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={(e) => handleFile(e.target.files[0])} />
               </div>
+              )}
 
               {words.length > 0 && (
                 <div className="wt-card">
-                  <div className="wt-label">2 · Quante domande?</div>
+                  <div className="wt-label">{canEdit ? "2 · " : ""}Quante domande?</div>
                   <div className="wt-row">
                     <input
                       className="wt-input"
