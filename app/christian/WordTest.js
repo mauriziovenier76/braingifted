@@ -76,6 +76,13 @@ export default function WordTest() {
   // Storico
   const [history, setHistory] = useState([]);
 
+  // Accesso amministratore direttamente in pagina
+  const [showLogin, setShowLogin] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
   // Modifica vocaboli
   const [draft, setDraft] = useState([]); // [{ key, it, en }]
   const [search, setSearch] = useState("");
@@ -103,26 +110,54 @@ export default function WordTest() {
     }
   };
 
+  // Scarica la lista di parole (e scopre se sei l'amministratore)
+  const loadWords = async () => {
+    try {
+      const res = await fetch(WORDS_API, { headers: await authHeaders() });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      const list = data.words || [];
+      setWords(list);
+      setCount(Math.min(10, list.length) || 10);
+      setCanEdit(!!data.canEdit);
+      return !!data.canEdit;
+    } catch (err) {
+      console.error(err);
+      setError("Non riesco a caricare la lista di parole. Riprova tra poco.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // All'apertura scarica la lista di parole e lo storico
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(WORDS_API, { headers: await authHeaders() });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        const list = data.words || [];
-        setWords(list);
-        setCount(Math.min(10, list.length) || 10);
-        setCanEdit(!!data.canEdit);
-      } catch (err) {
-        console.error(err);
-        setError("Non riesco a caricare la lista di parole. Riprova tra poco.");
-      } finally {
-        setLoading(false);
-      }
-    })();
+    loadWords();
     loadHistory();
   }, []);
+
+  /* ---------- Accesso amministratore ---------- */
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError(""); setLoggingIn(true);
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (authError) { setLoginError("Email o password non corretti."); return; }
+      const admin = await loadWords();
+      if (!admin) {
+        setLoginError("Accesso riuscito, ma questo account non è amministratore.");
+        return;
+      }
+      setPassword(""); setShowLogin(false);
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setCanEdit(false); setLoadInfo(""); setPhase("setup");
+  };
 
   // Mette il cursore nel campo giusto a ogni domanda
   useEffect(() => {
@@ -323,6 +358,8 @@ export default function WordTest() {
         .wt-edit-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; }
         .wt-del { background: transparent; border: 1px solid #333; color: #ff6b6b; width: 40px; height: 40px; border-radius: 10px; cursor: pointer; font-size: 1rem; }
         .wt-sticky { position: sticky; top: 0; background: #111; padding-bottom: 12px; z-index: 1; }
+        .wt-link { background: none; border: none; color: #555; font-size: 0.8rem; cursor: pointer; text-decoration: underline; }
+        .wt-link:hover { color: #999; }
         .wt-badge { font-weight: 700; padding: 2px 10px; border-radius: 100px; font-size: 0.85rem; }
         @media (max-width: 520px) { .wt-edit-row { grid-template-columns: 1fr auto; } .wt-edit-row input:nth-child(2) { grid-column: 1; } .wt-edit-row .wt-del { grid-row: 1 / span 2; grid-column: 2; } }
       `}</style>
@@ -414,6 +451,34 @@ export default function WordTest() {
                 </div>
               )}
             </>
+          )}
+
+          {/* ---------- ACCESSO AMMINISTRATORE (in fondo, discreto) ---------- */}
+          {phase === "setup" && !loading && (
+            <div style={{ marginTop: 32, textAlign: "center" }}>
+              {canEdit ? (
+                <button className="wt-link" onClick={handleLogout}>🔓 Esci dall'area amministratore</button>
+              ) : !showLogin ? (
+                <button className="wt-link" onClick={() => { setShowLogin(true); setLoginError(""); }}>🔒 Area amministratore</button>
+              ) : (
+                <div className="wt-card" style={{ textAlign: "left" }}>
+                  <div className="wt-label">Area amministratore</div>
+                  <form onSubmit={handleLogin}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      <input className="wt-input wt-input-sm" type="email" placeholder="Email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
+                      <input className="wt-input wt-input-sm" type="password" placeholder="Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                    </div>
+                    {loginError && <p style={{ color: "#ff6b6b", fontSize: "0.9rem", marginTop: 10 }}>{loginError}</p>}
+                    <div className="wt-row" style={{ marginTop: 16 }}>
+                      <button className="wt-btn" type="submit" disabled={loggingIn || !email.trim() || !password}>
+                        {loggingIn ? "⏳ Accesso..." : "Entra"}
+                      </button>
+                      <button className="wt-btn-ghost" type="button" onClick={() => setShowLogin(false)}>Annulla</button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
           )}
 
           {/* ---------- MODIFICA VOCABOLI (solo amministratore, mai durante un test) ---------- */}
