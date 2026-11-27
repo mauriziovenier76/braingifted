@@ -11,6 +11,9 @@ const MAX_ROWS_SHOWN = 200;
 // Normalizza una risposta: niente maiuscole, niente spazi in più
 const normalize = (s) => String(s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 
+// Più traduzioni giuste separate da ";" (es. "step-brother; half-brother")
+const alternatives = (en) => String(en ?? "").split(";").map((x) => x.trim()).filter(Boolean);
+
 // Mescola un array (algoritmo di Fisher-Yates)
 function shuffle(arr) {
   const a = [...arr];
@@ -294,8 +297,10 @@ export default function WordTest() {
     e.preventDefault();
     if (feedback || !answer.trim()) return;
     const q = questions[current];
-    const ok = normalize(answer) === normalize(q.en);
-    setFeedback({ ok, correct: q.en });
+    const given = normalize(answer);
+    const options = alternatives(q.en);
+    const ok = options.some((opt) => normalize(opt) === given);
+    setFeedback({ ok, correct: options.join(" oppure "), others: options.filter((opt) => normalize(opt) !== given) });
     setResults((prev) => [...prev, { ...q, given: answer.trim(), ok }]);
   };
 
@@ -559,7 +564,16 @@ export default function WordTest() {
                 </div>
               </form>
 
-              {feedback?.ok && <div className="wt-ok">🎉 BRAVO!</div>}
+              {feedback?.ok && (
+                <div className="wt-ok">
+                  🎉 BRAVO!
+                  {feedback.others.length > 0 && (
+                    <div style={{ fontSize: "0.85rem", fontWeight: 400, marginTop: 6, color: "#999" }}>
+                      Andava bene anche: <span style={{ textTransform: "uppercase" }}>{feedback.others.join(", ")}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               {feedback && !feedback.ok && (
                 <div className="wt-ko">
                   ❌ Non è giusto. La risposta corretta è<br />
@@ -600,7 +614,7 @@ export default function WordTest() {
                   <div className="wt-list">
                     {results.filter((r) => !r.ok).map((r, i) => (
                       <div key={i} className="wt-item">
-                        <span><strong>{r.it}</strong> → <span style={{ color: "#c8f135" }}>{r.en}</span></span>
+                        <span><strong>{r.it}</strong> → <span style={{ color: "#c8f135" }}>{alternatives(r.en).join(" oppure ")}</span></span>
                         <span style={{ color: "#ff6b6b" }}>hai scritto: {r.given}</span>
                       </div>
                     ))}
