@@ -9,6 +9,15 @@ const HEADER_WORDS = ["italiano", "inglese", "italian", "english", "ita", "eng",
 const MAX_ROWS_SHOWN = 200;
 const CATEGORIZE_API = "/api/christian-categorize";
 const ALL = "__tutte__";
+const SEEN_KEY = "bg-christian-seen"; // memoria delle parole già chieste (su questo dispositivo)
+
+// Legge/scrive quali parole sono già uscite e in quale "giro" di test
+function loadSeen() {
+  try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "{}") || {}; } catch { return {}; }
+}
+function saveSeen(data) {
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify(data)); } catch {}
+}
 
 // Normalizza una risposta: niente maiuscole, niente spazi in più
 const normalize = (s) => String(s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -105,6 +114,7 @@ export default function WordTest() {
   const [search, setSearch] = useState("");
   const [dirty, setDirty] = useState(false);
   const keyCounter = useRef(0);
+  const roundRef = useRef(0);
 
   const fileInputRef = useRef(null);
   const answerRef = useRef(null);
@@ -351,7 +361,13 @@ export default function WordTest() {
   /* ---------- Test ---------- */
   const startTest = () => {
     const n = Math.max(1, Math.min(Number(count) || 1, pool.length));
-    setQuestions(shuffle(pool).slice(0, n));
+    // Prima le parole mai uscite, poi quelle uscite meno di recente.
+    // A parità, l'ordine è casuale: così non escono sempre le stesse.
+    const seen = loadSeen();
+    const last = seen.words || {};
+    const ordered = shuffle(pool).sort((a, b) => (last[normalize(a.it)] || 0) - (last[normalize(b.it)] || 0));
+    roundRef.current = (seen.round || 0) + 1;
+    setQuestions(shuffle(ordered.slice(0, n)));
     setCurrent(0); setAnswer(""); setFeedback(null); setResults([]);
     setError(""); setLoadInfo("");
     setPhase("test");
@@ -371,6 +387,12 @@ export default function WordTest() {
     const ok = given !== "" && options.some((opt) => answerKey(opt) === given);
     setFeedback({ ok, correct: options.join(" / "), others: options.filter((opt) => answerKey(opt) !== given) });
     setResults((prev) => [...prev, { ...q, given: answer.trim(), ok }]);
+
+    // Segna la parola come "uscita" in questo giro
+    const seen = loadSeen();
+    seen.round = roundRef.current;
+    seen.words = { ...(seen.words || {}), [normalize(q.it)]: roundRef.current };
+    saveSeen(seen);
   };
 
   const saveTest = async (total, correct) => {
@@ -487,16 +509,16 @@ export default function WordTest() {
                 <div className="wt-card">
                   {categories.length > 0 && (
                     <div style={{ marginBottom: 20 }}>
-                      <div className="wt-label">Argomento</div>
+                      <div className="wt-label">Su cosa vuoi allenarti?</div>
                       <div className="wt-row">
                         <select className="wt-select" value={catFilter} onChange={(e) => { setCatFilter(e.target.value); setSubFilter(ALL); }}>
-                          <option value={ALL}>Tutte le categorie</option>
-                          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                          <option value={ALL}>Tutte le categorie ({words.length})</option>
+                          {categories.map((c) => <option key={c} value={c}>{c} ({words.filter((w) => w.cat === c).length})</option>)}
                         </select>
                         {catFilter !== ALL && subcategories.length > 0 && (
                           <select className="wt-select" value={subFilter} onChange={(e) => setSubFilter(e.target.value)}>
                             <option value={ALL}>Tutte le sottocategorie</option>
-                            {subcategories.map((sc) => <option key={sc} value={sc}>{sc}</option>)}
+                            {subcategories.map((sc) => <option key={sc} value={sc}>{sc} ({words.filter((w) => w.cat === catFilter && w.sub === sc).length})</option>)}
                           </select>
                         )}
                       </div>
