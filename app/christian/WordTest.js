@@ -11,6 +11,13 @@ const MAX_ROWS_SHOWN = 200;
 // Normalizza una risposta: niente maiuscole, niente spazi in più
 const normalize = (s) => String(s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 
+// Chiave per confrontare le risposte: ignora maiuscole, spazi, trattini e punteggiatura
+// (così "STEP-BROTHER", "step brother" e "stepbrother" valgono uguale)
+const answerKey = (s) =>
+  String(s ?? "")
+    .toLowerCase()
+    .replace(/[\s\-–—_'’`.,;:!?"()\/]/g, "");
+
 // Più traduzioni giuste separate da ";" (es. "step-brother; half-brother")
 const alternatives = (en) => String(en ?? "").split(";").map((x) => x.trim()).filter(Boolean);
 
@@ -297,10 +304,10 @@ export default function WordTest() {
     e.preventDefault();
     if (feedback || !answer.trim()) return;
     const q = questions[current];
-    const given = normalize(answer);
+    const given = answerKey(answer);
     const options = alternatives(q.en);
-    const ok = options.some((opt) => normalize(opt) === given);
-    setFeedback({ ok, correct: options.join(" oppure "), others: options.filter((opt) => normalize(opt) !== given) });
+    const ok = given !== "" && options.some((opt) => answerKey(opt) === given);
+    setFeedback({ ok, correct: options.join(" / "), others: options.filter((opt) => answerKey(opt) !== given) });
     setResults((prev) => [...prev, { ...q, given: answer.trim(), ok }]);
   };
 
