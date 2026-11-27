@@ -7,6 +7,8 @@ const WORDS_API = "/api/christian-words";
 const TESTS_API = "/api/christian-tests";
 const HEADER_WORDS = ["italiano", "inglese", "italian", "english", "ita", "eng", "parola", "traduzione"];
 const MAX_ROWS_SHOWN = 200;
+const CATEGORIZE_API = "/api/christian-categorize";
+const ALL = "__tutte__";
 
 // Normalizza una risposta: niente maiuscole, niente spazi in più
 const normalize = (s) => String(s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -44,6 +46,8 @@ function parseWorkbook(arrayBuffer) {
   rows.forEach((row, index) => {
     const it = String(row[0] ?? "").trim();
     const en = String(row[1] ?? "").trim();
+    const cat = String(row[2] ?? "").trim().toUpperCase();
+    const sub = String(row[3] ?? "").trim().toUpperCase();
     if (!it || !en) return;
 
     // Salta la riga di intestazione (es. "Italiano | Inglese")
@@ -53,7 +57,7 @@ function parseWorkbook(arrayBuffer) {
     const key = normalize(it);
     if (seen.has(key)) { duplicates++; return; }
     seen.add(key);
-    words.push({ it, en });
+    words.push({ it, en, cat, sub });
   });
 
   return { words, duplicates };
@@ -72,6 +76,9 @@ export default function WordTest() {
   const [loadInfo, setLoadInfo] = useState("");
   const [error, setError] = useState("");
   const [count, setCount] = useState(10);
+  const [catFilter, setCatFilter] = useState(ALL);
+  const [subFilter, setSubFilter] = useState(ALL);
+  const [categorizing, setCategorizing] = useState(false);
 
   // Schermata: setup | edit | test | result
   const [phase, setPhase] = useState("setup");
@@ -211,9 +218,20 @@ export default function WordTest() {
       return;
     }
 
+    // Se il file non ha le categorie, tengo quelle già assegnate alle stesse parole
+    const known = new Map(words.map((w) => [normalize(w.it), w]));
+    const merged = list.map((w) => {
+      const old = known.get(normalize(w.it));
+      return {
+        ...w,
+        cat: w.cat || old?.cat || "",
+        sub: w.sub || old?.sub || "",
+      };
+    });
+
     setSaving(true);
     try {
-      const saved = await saveWords(list);
+      const saved = await saveWords(merged);
       setCount(Math.min(10, saved.length));
       setLoadInfo(`✅ Salvate ${saved.length} parole${duplicates ? ` (${duplicates} doppioni ignorati)` : ""}. Christian le vede già.`);
     } catch (err) {
@@ -225,7 +243,7 @@ export default function WordTest() {
 
   /* ---------- Modifica vocaboli ---------- */
   const openEditor = () => {
-    setDraft(words.map((w) => ({ key: ++keyCounter.current, it: w.it, en: w.en })));
+    setDraft(words.map((w) => ({ key: ++keyCounter.current, it: w.it, en: w.en, cat: w.cat || "", sub: w.sub || "" })));
     setSearch(""); setDirty(false); setError(""); setLoadInfo("");
     setPhase("edit");
   };
@@ -254,7 +272,7 @@ export default function WordTest() {
   const saveDraft = async () => {
     setError(""); setLoadInfo("");
     const cleaned = draft
-      .map((r) => ({ it: r.it.trim(), en: r.en.trim() }))
+      .map((r) => ({ it: r.it.trim(), en: r.en.trim(), cat: (r.cat || "").trim().toUpperCase(), sub: (r.sub || "").trim().toUpperCase() }))
       .filter((r) => r.it && r.en);
     const incomplete = draft.length - cleaned.length;
 
@@ -267,7 +285,7 @@ export default function WordTest() {
     try {
       const saved = await saveWords(cleaned);
       const duplicates = cleaned.length - saved.length;
-      setDraft(saved.map((w) => ({ key: ++keyCounter.current, it: w.it, en: w.en })));
+      setDraft(saved.map((w) => ({ key: ++keyCounter.current, it: w.it, en: w.en, cat: w.cat || "", sub: w.sub || "" })));
       setDirty(false);
       const notes = [];
       if (duplicates) notes.push(`${duplicates} doppioni rimossi`);
@@ -283,13 +301,57 @@ export default function WordTest() {
   const filteredDraft = useMemo(() => {
     const q = normalize(search);
     if (!q) return draft;
-    return draft.filter((r) => normalize(r.it).includes(q) || normalize(r.en).includes(q));
+    return draft.filter((r) => [r.it, r.en, r.cat, r.sub].some((v) => normalize(v).includes(q)));
   }, [draft, search]);
+
+  /* ---------- Categorie ---------- */
+  const categories = useMemo(
+    () => [...new Set(words.map((w) => w.cat).filter(Boolean))].sort(),
+    [words]
+  );
+  const subcategories = useMemo(
+    () => [...new Set(words.filter((w) => w.cat === catFilter).map((w) => w.sub).filter(Boolean))].sort(),
+    [words, catFilter]
+  );
+  // Le parole tra cui pescare le domande, in base all'argomento scelto
+  const pool = useMemo(
+    () => words.filter((w) =>
+      (catFilter === ALL || w.cat === catFilter) &&
+      (subFilter === ALL || w.sub === subFilter)
+    ),
+    [words, catFilter, subFilter]
+  );
+  useEffect(() => {
+    if (catFilter !== ALL && !categories.includes(catFilter)) { setCatFilter(ALL); setSubFilter(ALL); }
+  }, [categories, catFilter]);
+
+  const uncategorized = words.filter((w) => !w.cat || !w.sub).length;
+
+  // Chiede all'AI le categorie, un gruppo di parole alla volta
+  const categorizeWithAI = async () => {
+    setError(""); setLoadInfo(""); setCategorizing(true);
+    let total = 0;
+    try {
+      for (let round = 0; round < 100; round++) {
+        const res = await fetch(CATEGORIZE_API, { method: "POST", headers: await authHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Categorizzazione non riuscita.");
+        setWords(data.words);
+        total += data.done;
+        setLoadInfo(`✨ Categorizzate ${total} parole${data.remaining ? `, ne mancano ${data.remaining}...` : ". Fatto!"}`);
+        if (!data.remaining || !data.done) break;
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCategorizing(false);
+    }
+  };
 
   /* ---------- Test ---------- */
   const startTest = () => {
-    const n = Math.max(1, Math.min(Number(count) || 1, words.length));
-    setQuestions(shuffle(words).slice(0, n));
+    const n = Math.max(1, Math.min(Number(count) || 1, pool.length));
+    setQuestions(shuffle(pool).slice(0, n));
     setCurrent(0); setAnswer(""); setFeedback(null); setResults([]);
     setError(""); setLoadInfo("");
     setPhase("test");
@@ -367,13 +429,16 @@ export default function WordTest() {
         .wt-score { font-size: 4.5rem; font-weight: 800; color: #c8f135; text-align: center; line-height: 1; }
         .wt-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
         .wt-item { display: flex; justify-content: space-between; gap: 12px; background: #1a1a1a; border-radius: 10px; padding: 10px 14px; font-size: 0.9rem; flex-wrap: wrap; align-items: center; }
-        .wt-edit-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; }
+        .wt-edit-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #1d1d1d; }
+        .wt-edit-row .wt-in-cat { grid-column: 1; }
+        .wt-edit-row .wt-in-sub { grid-column: 2; }
+        .wt-in-cat, .wt-in-sub { font-size: 0.8rem !important; padding: 7px 10px !important; color: #c8f135 !important; text-transform: uppercase; }
+        .wt-select { padding: 10px 12px; background: #0a0a0a; border: 1px solid #333; border-radius: 10px; color: #f0f0f0; font-size: 0.95rem; min-width: 160px; }
         .wt-del { background: transparent; border: 1px solid #333; color: #ff6b6b; width: 40px; height: 40px; border-radius: 10px; cursor: pointer; font-size: 1rem; }
         .wt-sticky { position: sticky; top: 0; background: #111; padding-bottom: 12px; z-index: 1; }
         .wt-link { background: none; border: none; color: #555; font-size: 0.8rem; cursor: pointer; text-decoration: underline; }
         .wt-link:hover { color: #999; }
         .wt-badge { font-weight: 700; padding: 2px 10px; border-radius: 100px; font-size: 0.85rem; }
-        @media (max-width: 520px) { .wt-edit-row { grid-template-columns: 1fr auto; } .wt-edit-row input:nth-child(2) { grid-column: 1; } .wt-edit-row .wt-del { grid-row: 1 / span 2; grid-column: 2; } }
       `}</style>
 
       <div className="wt">
@@ -399,14 +464,19 @@ export default function WordTest() {
                 <div className="wt-card">
                   <div className="wt-label">Lista di parole · {words.length}</div>
                   <p className="wt-muted" style={{ marginBottom: 16 }}>
-                    File Excel con 2 colonne: <strong>A = italiano</strong>, <strong>B = inglese</strong>. Un nuovo file sostituisce la lista per tutti.
+                    File Excel: <strong>A = italiano</strong>, <strong>B = inglese</strong>, e se vuoi <strong>C = categoria</strong>, <strong>D = sottocategoria</strong>. Un nuovo file sostituisce la lista per tutti (le categorie già assegnate restano).
                   </p>
                   <div className="wt-row">
                     <button className="wt-btn-ghost" onClick={() => fileInputRef.current?.click()} disabled={saving}>
                       {saving ? "⏳ Salvataggio..." : `📄 ${words.length ? "Ricarica file" : "Carica file Excel"}`}
                     </button>
                     {words.length > 0 && (
-                      <button className="wt-btn-ghost" onClick={openEditor} disabled={saving}>✏️ Verifica e correggi vocaboli</button>
+                      <button className="wt-btn-ghost" onClick={openEditor} disabled={saving || categorizing}>✏️ Verifica e correggi vocaboli</button>
+                    )}
+                    {uncategorized > 0 && (
+                      <button className="wt-btn-ghost" onClick={categorizeWithAI} disabled={saving || categorizing}>
+                        {categorizing ? "⏳ Categorizzo..." : `✨ Categorizza con AI (${uncategorized} senza categoria)`}
+                      </button>
                     )}
                   </div>
                   <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={(e) => handleFile(e.target.files[0])} />
@@ -415,6 +485,23 @@ export default function WordTest() {
 
               {words.length > 0 && (
                 <div className="wt-card">
+                  {categories.length > 0 && (
+                    <div style={{ marginBottom: 20 }}>
+                      <div className="wt-label">Argomento</div>
+                      <div className="wt-row">
+                        <select className="wt-select" value={catFilter} onChange={(e) => { setCatFilter(e.target.value); setSubFilter(ALL); }}>
+                          <option value={ALL}>Tutte le categorie</option>
+                          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        {catFilter !== ALL && subcategories.length > 0 && (
+                          <select className="wt-select" value={subFilter} onChange={(e) => setSubFilter(e.target.value)}>
+                            <option value={ALL}>Tutte le sottocategorie</option>
+                            {subcategories.map((sc) => <option key={sc} value={sc}>{sc}</option>)}
+                          </select>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <div className="wt-label">Quante domande?</div>
                   <form onSubmit={(e) => { e.preventDefault(); startTest(); }}>
                     <div className="wt-row">
@@ -422,16 +509,15 @@ export default function WordTest() {
                         className="wt-input"
                         type="number"
                         min={1}
-                        max={words.length}
                         value={count}
                         onChange={(e) => setCount(e.target.value)}
                         style={{ width: 110 }}
                         autoFocus
                       />
-                      <span className="wt-muted">su {words.length} disponibili</span>
+                      <span className="wt-muted">su {pool.length} disponibili</span>
                     </div>
                     <div style={{ marginTop: 20 }}>
-                      <button className="wt-btn" type="submit" disabled={!Number(count) || Number(count) < 1}>
+                      <button className="wt-btn" type="submit" disabled={!pool.length || !Number(count) || Number(count) < 1}>
                         Inizia il test →
                       </button>
                     </div>
@@ -503,7 +589,7 @@ export default function WordTest() {
                 </div>
                 <input
                   className="wt-input wt-input-sm"
-                  placeholder="🔍 Cerca in italiano o in inglese..."
+                  placeholder="🔍 Cerca parola, traduzione o categoria..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -518,12 +604,17 @@ export default function WordTest() {
 
               {search && <p className="wt-muted" style={{ margin: "8px 0" }}>{filteredDraft.length} risultati</p>}
 
+              <datalist id="wt-cats">{[...new Set(draft.map((r) => (r.cat || "").toUpperCase()).filter(Boolean))].sort().map((c) => <option key={c} value={c} />)}</datalist>
+              <datalist id="wt-subs">{[...new Set(draft.map((r) => (r.sub || "").toUpperCase()).filter(Boolean))].sort().map((c) => <option key={c} value={c} />)}</datalist>
+
               <div className="wt-list">
                 {filteredDraft.slice(0, MAX_ROWS_SHOWN).map((r) => (
                   <div key={r.key} className="wt-edit-row">
                     <input className="wt-input wt-input-sm" value={r.it} placeholder="Italiano" onChange={(e) => updateRow(r.key, "it", e.target.value)} />
                     <input className="wt-input wt-input-sm" value={r.en} placeholder="Inglese" onChange={(e) => updateRow(r.key, "en", e.target.value)} />
                     <button className="wt-del" title="Elimina" onClick={() => deleteRow(r.key)}>🗑️</button>
+                    <input className="wt-input wt-input-sm wt-in-cat" list="wt-cats" value={r.cat} placeholder="Categoria" onChange={(e) => updateRow(r.key, "cat", e.target.value)} />
+                    <input className="wt-input wt-input-sm wt-in-sub" list="wt-subs" value={r.sub} placeholder="Sottocategoria" onChange={(e) => updateRow(r.key, "sub", e.target.value)} />
                   </div>
                 ))}
               </div>

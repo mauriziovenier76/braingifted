@@ -66,11 +66,13 @@ export async function POST(request) {
     for (const w of body.words) {
       const it = String(w?.it ?? "").trim().slice(0, 200);
       const en = String(w?.en ?? "").trim().slice(0, 200);
+      const cat = String(w?.cat ?? "").trim().toUpperCase().slice(0, 60);
+      const sub = String(w?.sub ?? "").trim().toUpperCase().slice(0, 60);
       if (!it || !en) continue;
       const key = normalize(it);
       if (seen.has(key)) continue;
       seen.add(key);
-      words.push({ it, en });
+      words.push({ it, en, cat, sub });
       if (words.length >= MAX_WORDS) break;
     }
 
